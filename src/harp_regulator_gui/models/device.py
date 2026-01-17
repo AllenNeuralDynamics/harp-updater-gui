@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Device(BaseModel):
@@ -33,6 +33,13 @@ class Device(BaseModel):
     
     class Config:
         populate_by_name = True
+
+    @field_validator("serial_number", mode="before")
+    def serialize_serial_number(cls, value):
+        """Convert serial numbers coming in as ints to strings."""
+        if value is None:
+            return value
+        return str(value)
         
     @property
     def display_name(self) -> str:
