@@ -11,8 +11,7 @@ import sys
 from pathlib import Path
 from nicegui import ui, app, run
 from harp_regulator_gui.components.header import Header
-from harp_regulator_gui.components.device_list import DeviceList
-from harp_regulator_gui.components.firmware_browser import FirmwareBrowser
+from harp_regulator_gui.components.device_table import DeviceTable
 from harp_regulator_gui.components.update_workflow import UpdateWorkflow
 from harp_regulator_gui.services.device_manager import DeviceManager
 from harp_regulator_gui.services.firmware_service import FirmwareService
@@ -33,8 +32,7 @@ class HarpFirmwareUpdaterApp:
         
         # Initialize components (will be set in render)
         self.header = None
-        self.device_list = None
-        self.firmware_browser = None
+        self.device_table = None
         self.update_workflow = None
     
     def on_device_select(self, device: Device):
@@ -44,7 +42,8 @@ class HarpFirmwareUpdaterApp:
         Args:
             device: Selected device
         """
-        self.firmware_browser.update_device(device)
+        # No longer needed with integrated table
+        pass
     
     async def on_firmware_deploy(self, device: Device, firmware_path: str, force: bool = False):
         """
@@ -113,14 +112,8 @@ class HarpFirmwareUpdaterApp:
                 self.update_workflow.add_log('✓ Firmware verified')
                 self.update_workflow.complete_update(True)
                 
-                # Refresh device list to get updated info (without connecting to avoid port conflicts)
-                self.device_list.refresh_devices()
-                
-                # Update firmware browser with fresh device info
-                updated_devices = self.device_manager.get_devices()
-                updated_device = next((d for d in updated_devices if d.port_name == device.port_name), None)
-                if updated_device:
-                    self.firmware_browser.update_device(updated_device)
+                # Refresh device table to get updated info
+                self.device_table.refresh_devices()
                 
             else:
                 self.update_workflow.add_log(f'✗ Upload failed: {output}')
@@ -161,27 +154,21 @@ class HarpFirmwareUpdaterApp:
         # Create header with dark mode toggle
         self.header = Header(dark_mode_toggle=dark_mode)
         
-        # Main content area with 3-column layout
+        # Main content area with device table and activity log
         with ui.element('div').classes('app-container'):
-            # Left: Device List (fixed width)
-            self.device_list = DeviceList(
-                device_manager=self.device_manager,
-                on_device_select=self.on_device_select
-            )
-            self.device_list.render()
-            
-            # Use splitter for resizable firmware browser and activity log
-            with ui.splitter(limits= (50, 80), value=70).classes('flex-1') as splitter:
+            # Use splitter for resizable device table and activity log
+            with ui.splitter(limits=(30, 80), value=75).classes('flex-1') as splitter:
                 with splitter.before:
-                    # Center: Firmware Browser (flexible width)
-                    self.firmware_browser = FirmwareBrowser(
+                    # Device table with integrated firmware upload
+                    self.device_table = DeviceTable(
+                        device_manager=self.device_manager,
                         firmware_service=self.firmware_service,
                         on_deploy=self.on_firmware_deploy
                     )
-                    self.firmware_browser.render()
+                    self.device_table.render()
                 
                 with splitter.after:
-                    # Right: Update Workflow (resizable)
+                    # Activity log
                     self.update_workflow = UpdateWorkflow()
                     self.update_workflow.render()
         
