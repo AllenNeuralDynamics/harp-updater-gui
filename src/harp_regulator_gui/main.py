@@ -12,10 +12,11 @@ from pathlib import Path
 from nicegui import ui, app, run
 from harp_regulator_gui.components.header import Header
 from harp_regulator_gui.components.device_table import DeviceTable
-from harp_regulator_gui.components.update_workflow import UpdateWorkflow
+from harp_regulator_gui.components.update_workflow import UpdateWorkflow, LogLevel
 from harp_regulator_gui.services.device_manager import DeviceManager
 from harp_regulator_gui.services.firmware_service import FirmwareService
 from harp_regulator_gui.models.device import Device
+from typing import List
 
 # Get the path to the static directory
 STATIC_DIR = Path(__file__).parent / 'static'
@@ -27,8 +28,8 @@ class HarpFirmwareUpdaterApp:
     def __init__(self):
         """Initialize the application"""
         # Initialize services
-        self.device_manager = DeviceManager("C:\\Users\\anjal\\Projects\\aind\\harp-regulator\\artifacts\\bin\\HarpRegulator\\debug\\HarpRegulator.exe")
-        self.firmware_service = FirmwareService("C:\\Users\\anjal\\Projects\\aind\\harp-regulator\\artifacts\\bin\\HarpRegulator\\debug\\HarpRegulator.exe")
+        self.device_manager = DeviceManager("C:\\Users\\anjal.doshi\\projects\\aind\\harp-regulator\\artifacts\\bin\\HarpRegulator\\release\\HarpRegulator.exe")
+        self.firmware_service = FirmwareService("C:\\Users\\anjal.doshi\\projects\\aind\\harp-regulator\\artifacts\\bin\\HarpRegulator\\release\\HarpRegulator.exe")
         
         # Initialize components (will be set in render)
         self.header = None
@@ -45,90 +46,135 @@ class HarpFirmwareUpdaterApp:
         # No longer needed with integrated table
         pass
     
-    async def on_firmware_deploy(self, device: Device, firmware_path: str, force: bool = False):
+    async def on_firmware_deploy(self, devices: List[Device], firmware_path: str, force: bool = False):
         """
-        Handle firmware deployment
+        Handle firmware deployment for one or more devices (batch update support)
         
         Args:
-            device: Target device
+            devices: List of target devices (supports batch updates for devices with same name)
             firmware_path: Path to firmware file or version string
             force: Force upload even if checks fail
         """
+        # Handle single device passed as non-list for backwards compatibility
+        if isinstance(devices, Device):
+            devices = [devices]
+        
+        total_devices = len(devices)
+        is_batch = total_devices > 1
+        
         # Show loading spinner
         with ui.dialog() as loading_dialog, ui.card().classes('items-center p-6'):
             ui.spinner(size='xl', color='primary')
-            ui.label('Uploading firmware...').classes('text-lg mt-4')
-            ui.label('Please wait, do not disconnect the device').classes('text-sm text-secondary mt-2')
+            if is_batch:
+                upload_label = ui.label(f'Uploading firmware to {total_devices} devices...').classes('text-lg mt-4')
+            else:
+                upload_label = ui.label('Uploading firmware...').classes('text-lg mt-4')
+            ui.label('Please wait, do not disconnect the device(s)').classes('text-sm text-secondary mt-2')
         
         loading_dialog.open()
         
         try:
             # Start update workflow
-            self.update_workflow.start_update(device.display_name, firmware_path)
+            if is_batch:
+                device_names = set(d.display_name for d in devices)
+                if len(device_names) == 1:
+                    self.update_workflow.start_batch_update(list(device_names)[0], total_devices, firmware_path)
+                else:
+                    self.update_workflow.push_log(f'Starting batch firmware update for {total_devices} devices', LogLevel.INFO)
+                    self.update_workflow.push_log(f'Target firmware: {firmware_path}', LogLevel.INFO)
+            else:
+                self.update_workflow.start_update(devices[0].display_name, firmware_path)
             
             # Close any device connections by refreshing without connecting
-            self.update_workflow.add_log('Closing device connections...')
+            self.update_workflow.push_log('Closing device connections...', LogLevel.INFO)
             await run.cpu_bound(self.device_manager.refresh_devices, allow_connect=False)
             
             # Wait for OS to release port handles
             await run.io_bound(lambda: __import__('time').sleep(3))
             
             # Step 1: Validate firmware file
-            self.update_workflow.add_log(f'Validating firmware file: {firmware_path}')
+            self.update_workflow.push_log(f'Validating firmware file: {firmware_path}', LogLevel.INFO)
             
             # Validate using firmware service
             if not self.firmware_service.validate_firmware_file(firmware_path):
-                self.update_workflow.add_log(f'✗ Error: Invalid firmware file')
+                self.update_workflow.push_log('Invalid firmware file', LogLevel.ERROR)
                 self.update_workflow.show_error(f'Invalid firmware file. Must be .uf2 or .hex format: {firmware_path}')
                 ui.notify('Invalid firmware file', type='negative')
                 return
             
-            self.update_workflow.add_log(f'✓ Firmware file validated')
+            self.update_workflow.push_log('Firmware file validated', LogLevel.SUCCESS)
             
-            # Step 2: Flash firmware
-            if force:
-                self.update_workflow.add_log(f'Starting FORCED firmware upload to {device.display_name}...')
-            else:
-                self.update_workflow.add_log(f'Starting firmware upload to {device.display_name}...')
+            # Track results for batch updates
+            success_count = 0
+            fail_count = 0
             
-            # Upload firmware using device manager (run in thread to avoid blocking UI)
-            success, output = await run.cpu_bound(
-                self.device_manager.upload_firmware_to_device,
-                device,
-                firmware_path,
-                force
-            )
-            
-            if success:
-                self.update_workflow.add_log('✓ Firmware uploaded successfully')
+            # Step 2: Flash firmware to each device
+            for idx, device in enumerate(devices, 1):
+                if is_batch:
+                    upload_label.set_text(f'Uploading firmware ({idx}/{total_devices})...')
+                    self.update_workflow.push_log(f'--- Device {idx}/{total_devices}: {device.display_name} ({device.port_name}) ---', LogLevel.INFO)
                 
-                # Step 3: Verify
-                self.update_workflow.add_log('Verifying firmware installation...')
+                if force:
+                    self.update_workflow.push_log(f'Starting FORCED firmware upload to {device.display_name}...', LogLevel.WARNING)
+                else:
+                    self.update_workflow.push_log(f'Starting firmware upload to {device.display_name} ({device.port_name})...', LogLevel.INFO)
+                
+                # Upload firmware using device manager (run in thread to avoid blocking UI)
+                success, output = await run.cpu_bound(
+                    self.device_manager.upload_firmware_to_device,
+                    device,
+                    firmware_path,
+                    force
+                )
+                
+                if success:
+                    success_count += 1
+                    self.update_workflow.push_log(f'Firmware uploaded successfully to {device.display_name}', LogLevel.SUCCESS)
+                    
+                    # Wait between devices for batch updates
+                    if is_batch and idx < total_devices:
+                        self.update_workflow.push_log('Waiting before next device...', LogLevel.INFO)
+                        await run.io_bound(lambda: __import__('time').sleep(2))
+                else:
+                    fail_count += 1
+                    self.update_workflow.push_log(f'Upload failed for {device.display_name}: {output}', LogLevel.ERROR)
+                    
+                    # For single device, show error dialog
+                    if not is_batch:
+                        if not force:
+                            error_msg = f'Firmware upload failed: {output}'
+                            self.update_workflow.show_error_with_force(error_msg)
+                        else:
+                            self.update_workflow.show_error(f'Forced firmware upload failed: {output}')
+                        ui.notify('Firmware upload failed', type='negative')
+                        return
+            
+            # Step 3: Verify and complete
+            if is_batch:
+                self.update_workflow.push_log(f'Batch update complete: {success_count}/{total_devices} successful', 
+                                              LogLevel.SUCCESS if fail_count == 0 else LogLevel.WARNING)
+                
+                if fail_count > 0:
+                    self.update_workflow.push_log(f'{fail_count} device(s) failed to update', LogLevel.ERROR)
+                    ui.notify(f'Batch update: {success_count} succeeded, {fail_count} failed', type='warning')
+                else:
+                    self.update_workflow.push_log('All devices updated successfully!', LogLevel.SUCCESS)
+                    ui.notify(f'Successfully updated {success_count} device(s)!', type='positive')
+            else:
+                self.update_workflow.push_log('Verifying firmware installation...', LogLevel.INFO)
                 
                 # Give device time to reboot and reconnect (5 seconds)
-                self.update_workflow.add_log('Waiting for device to reboot...')
+                self.update_workflow.push_log('Waiting for device to reboot...', LogLevel.INFO)
                 await run.io_bound(lambda: __import__('time').sleep(5))
                 
-                self.update_workflow.add_log('✓ Firmware verified')
+                self.update_workflow.push_log('Firmware verified', LogLevel.SUCCESS)
                 self.update_workflow.complete_update(True)
-                
-                # Refresh device table to get updated info
-                self.device_table.refresh_devices()
-                
-            else:
-                self.update_workflow.add_log(f'✗ Upload failed: {output}')
-                
-                # If not already forced, suggest enabling force upload checkbox
-                if not force:
-                    error_msg = f'Firmware upload failed: {output}'
-                    self.update_workflow.show_error_with_force(error_msg)
-                else:
-                    self.update_workflow.show_error(f'Forced firmware upload failed: {output}')
-                
-                ui.notify('Firmware upload failed', type='negative')
+            
+            # Refresh device table to get updated info
+            self.device_table.refresh_devices()
                 
         except Exception as e:
-            self.update_workflow.add_log(f'✗ Error during upload: {str(e)}')
+            self.update_workflow.push_log(f'Error during upload: {str(e)}', LogLevel.ERROR)
             self.update_workflow.show_error(f'Error during firmware upload: {str(e)}')
             ui.notify(f'Upload error: {str(e)}', type='negative')
         finally:
@@ -198,17 +244,21 @@ def start_app():
     app_instance.render()
 
     # Run the application
-    ui.run(
-        title='HARP Regulator GUI',
-        favicon='🔧',
-        host="0.0.0.0",
-        port=4277,
-        dark=None,  # Start in auto mode (respects system preference)
-        reload=False,
-        show=True,
-        native=True,
-        window_size=(1200, 1000),
-    )
+    try:
+        ui.run(
+            title='HARP Regulator GUI',
+            favicon='🔧',
+            host="0.0.0.0",
+            port=4277,
+            dark=None,  # Start in auto mode (respects system preference)
+            reload=False,
+            show=True,
+            native=True,
+            window_size=(1200, 800),
+        )
+    except KeyboardInterrupt:
+        # Clean shutdown on Ctrl+C
+        pass
 
 
 # Start the app if running as a module

@@ -1,64 +1,104 @@
 from nicegui import ui
-from typing import List, Dict
+from typing import List, Dict, Literal
 from datetime import datetime
+from enum import Enum
+
+
+class LogLevel(Enum):
+    """Log level enumeration for activity log"""
+    INFO = "info"
+    SUCCESS = "success"
+    WARNING = "warning"
+    ERROR = "error"
+    DEBUG = "debug"
 
 
 class UpdateWorkflow:
     """Update workflow panel component"""
     
+    # Color mapping for log levels (CSS class names)
+    LOG_COLORS = {
+        LogLevel.INFO: "log-info",
+        LogLevel.SUCCESS: "log-success",
+        LogLevel.WARNING: "log-warning",
+        LogLevel.ERROR: "log-error",
+        LogLevel.DEBUG: "log-debug",
+    }
+    
+    # Prefix icons for log levels
+    LOG_PREFIXES = {
+        LogLevel.INFO: "ℹ",
+        LogLevel.SUCCESS: "✓",
+        LogLevel.WARNING: "⚠",
+        LogLevel.ERROR: "✗",
+        LogLevel.DEBUG: "🔍",
+    }
+    
     def __init__(self):
         """Initialize update workflow component"""
-        self.log_messages: List[str] = []
         self.has_error = False
         self.error_message = ""
         
         # UI elements
-        self.log_container = None
+        self.log = None
         self.alert_container = None
     
     def render(self):
         """Render the update workflow panel"""
-        with ui.column().classes('sidebar-right workflow-container'):
+        with ui.column().classes('workflow-container w-full'):
             # Workflow title
             ui.label('Activity Log').classes('workflow-title')
             
             # Log section
-            with ui.column().classes('workflow-section'):
-                self.log_container = ui.column().classes('activity-log')
-                self.add_log('Waiting for update to start...')
+            self.log = ui.log(max_lines=100).classes('activity-log w-full')
+            self.push_log('Ready to start firmware updates.', LogLevel.INFO)
             
             # Alert container (initially hidden)
             self.alert_container = ui.column().classes('hidden')
     
     def start_update(self, device_name: str, firmware_version: str):
         """
-        Start an update workflow
+        Start an update workflow for a single device
         
         Args:
             device_name: Name of device being updated
             firmware_version: Firmware version being installed
         """
         self.has_error = False
-        self.log_messages = []
         
-        self.add_log(f'Starting firmware update for {device_name}')
-        self.add_log(f'Target firmware version: {firmware_version}')
+        self.push_log(f'Starting firmware update for {device_name}', LogLevel.INFO)
+        self.push_log(f'Target firmware version: {firmware_version}', LogLevel.INFO)
     
-    def add_log(self, message: str):
+    def start_batch_update(self, device_name: str, device_count: int, firmware_version: str):
         """
-        Add a log message
+        Start a batch update workflow for multiple devices with the same name
+        
+        Args:
+            device_name: Name of devices being updated
+            device_count: Number of devices to update
+            firmware_version: Firmware version being installed
+        """
+        self.has_error = False
+        
+        self.push_log(f'Starting BATCH firmware update for {device_count} "{device_name}" devices', LogLevel.INFO)
+        self.push_log(f'Target firmware version: {firmware_version}', LogLevel.INFO)
+    
+    def push_log(self, message: str, level: LogLevel = LogLevel.INFO):
+        """
+        Push a log message with a specific level and color
         
         Args:
             message: Log message text
+            level: Log level (INFO, SUCCESS, WARNING, ERROR, DEBUG)
         """
         timestamp = datetime.now().strftime('%H:%M:%S')
-        log_entry = f'[{timestamp}] {message}'
-        self.log_messages.append(log_entry)
+        prefix = self.LOG_PREFIXES.get(level, "")
+        color_class = self.LOG_COLORS.get(level, "log-info")
+        log_entry = f'[{timestamp}] {prefix} {message}'
         
-        # Update UI
-        if self.log_container:
-            with self.log_container:
-                ui.label(log_entry).classes('text-xs')
+        # Update UI with colored log entry
+        if self.log:
+            self.log.push(log_entry, classes=color_class)
     
     def show_error(self, error_message: str):
         """
@@ -109,13 +149,13 @@ class UpdateWorkflow:
     def on_retry(self):
         """Handle retry button click"""
         self.hide_error()
-        self.add_log('Retrying update...')
+        self.push_log('Retrying update...', LogLevel.WARNING)
         ui.notify('Retrying update', type='info')
     
     def on_rollback(self):
         """Handle rollback button click"""
         self.hide_error()
-        self.add_log('Rolling back to previous firmware...')
+        self.push_log('Rolling back to previous firmware...', LogLevel.WARNING)
         ui.notify('Rolling back firmware', type='warning')
     
     def complete_update(self, success: bool):
@@ -126,7 +166,8 @@ class UpdateWorkflow:
             success: Whether update completed successfully
         """
         if success:
-            self.add_log('✓ Firmware update completed successfully!')
+            self.push_log('Firmware update completed successfully!', LogLevel.SUCCESS)
             ui.notify('Firmware update completed!', type='positive')
         else:
+            self.push_log('Firmware update failed. Please check the logs and try again.', LogLevel.ERROR)
             self.show_error('Firmware update failed. Please check the logs and try again.')

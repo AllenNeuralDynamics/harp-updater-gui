@@ -13,7 +13,7 @@
     --bg-tertiary: #f3f4f6;
     
     --text-primary: #111827;
-    --text-secondary: #6b7280;
+    --text-secondary: #40444d;
     --text-tertiary: #9ca3af;
     
     --border-color: #e5e7eb;
@@ -162,6 +162,10 @@ body, html {
     background-color: var(--bg-primary);
 }
 
+.q-table__bottom {
+    background-color: var(--bg-primary);
+}
+
 .q-table thead tr,
 .q-table tbody td {
     border-color: var(--border-color);
@@ -184,6 +188,7 @@ body, html {
     background-color: color-mix(in srgb, var(--q-primary) 10%, var(--bg-primary));
 }
 
+
 /* Firmware upload card */
 .firmware-upload-card {
     background-color: var(--bg-primary);
@@ -201,7 +206,10 @@ body, html {
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow-y: auto;
+    width: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    margin-bottom: 2rem;
 }
 
 .workflow-section {
@@ -225,26 +233,62 @@ body, html {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
-    padding: 0.75rem;
     font-family: 'Courier New', monospace;
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    width: 100% !important;
+    min-width: 0;
+    min-height: 150px;
     flex: 1;
-    width: 100%;
-    overflow-y: auto;
     line-height: 1.5;
     user-select: text;
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+    box-sizing: border-box;
 }
 
-.activity-log * {
-    user-select: text;
-    -webkit-user-select: text;
-    -moz-user-select: text;
-    -ms-user-select: text;
+/* Log Level Colors */
+.log-info {
+    color: var(--text-secondary);
 }
+
+.log-success {
+    color: #10b981; /* Green */
+}
+
+.log-warning {
+    color: #f59e0b; /* Orange */
+}
+
+.log-error {
+    color: #ef4444; /* Red */
+}
+
+.log-debug {
+    color: #8b5cf6; /* Purple */
+}
+
+/* Dark mode log colors - slightly brighter for visibility */
+body.body--dark .log-info {
+    color: var(--text-secondary);
+}
+
+body.body--dark .log-success {
+    color: #34d399;
+}
+
+body.body--dark .log-warning {
+    color: #fbbf24;
+}
+
+body.body--dark .log-error {
+    color: #f87171;
+}
+
+body.body--dark .log-debug {
+    color: #a78bfa;
+}
+
 
 /* ===================
    Buttons

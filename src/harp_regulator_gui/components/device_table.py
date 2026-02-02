@@ -31,25 +31,23 @@ class DeviceTable:
         self.selected_device: Optional[Device] = None
         self.firmware_file_path: Optional[str] = None
         self.force_upload_checkbox = None
+        self.batch_update_checkbox = None
         self.file_path_label = None
         self.deploy_button = None
         
         # Search and filter state
-        self.search_query = ""
         self.filter_type = "All types"
     
     def render(self):
         """Render the device table panel"""
-        with ui.column().classes('flex-1 gap-4 p-4'):
+        with ui.column().classes('device-table-container w-full mb-3'):
             # Header with controls
             with ui.row().classes('w-full items-center justify-between gap-4'):
                 ui.label('Harp Devices').classes('text-2xl font-bold')
                 
                 with ui.row().classes('gap-2'):
-                    # Search
-                    ui.input(placeholder='Search devices...').classes('w-64').bind_value(
-                        self, 'search_query'
-                    ).on('input', self.update_table)
+                    # Search input with dynamic filtering
+                    search_input = ui.input(placeholder='Search devices...').classes('w-64')
                     
                     # Filter dropdown
                     ui.select(
@@ -74,7 +72,7 @@ class DeviceTable:
                 row_key='port',
                 selection='single',
                 pagination={'rowsPerPage': 10, 'sortBy': 'name', 'descending': False}
-            ).classes('w-full device-table').props('flat bordered').on('selection', self.on_row_select)
+            ).classes('w-full').props('flat bordered').on('selection', self.on_row_select)
             
             self.table.add_slot('body-cell-status', '''
                 <q-td :props="props">
@@ -90,23 +88,30 @@ class DeviceTable:
                 </q-td>
             ''')
             
+            # Bind search input to table filter after table is created
+            search_input.bind_value(self.table, 'filter')
+            
             # Firmware upload section
             with ui.card().classes('w-full p-4 firmware-upload-card'):
                 ui.label('Firmware Upload').classes('text-lg font-semibold mb-3')
                 
-                with ui.row().classes('w-full items-end gap-4'):
-                    # File picker
-                    with ui.column().classes('flex-1'):
-                        ui.label('Select Firmware File').classes('text-sm font-medium mb-1')
+                with ui.row().classes('w-full items-start gap-8'):
+                    # Column 1: File picker
+                    with ui.column().classes('flex-1 gap-2'):
+                        ui.label('Select Firmware File').classes('text-sm font-medium')
                         with ui.row().classes('gap-2 items-center'):
                             ui.button('📁 Browse', on_click=self.browse_firmware).classes('btn btn-secondary')
                             self.file_path_label = ui.label('No file selected').classes('text-sm text-secondary')
                     
-                    # Force upload checkbox
-                    self.force_upload_checkbox = ui.checkbox('Force upload (bypass safety checks)').classes('mb-1')
-                    
-                    # Deploy button
-                    self.deploy_button = ui.button('🚀 Deploy Firmware', on_click=self.deploy_firmware).classes('btn btn-primary')
+                    # Column 2: Checkboxes and Deploy button
+                    with ui.column().classes('gap-2'):
+                        # Checkboxes
+                        self.batch_update_checkbox = ui.checkbox('Update all devices with same name')
+                        self.batch_update_checkbox.tooltip('When enabled, all devices with the same name as the selected device will be updated')
+                        self.force_upload_checkbox = ui.checkbox('Force upload (bypass safety checks)')
+                        
+                        # Deploy button
+                        self.deploy_button = ui.button('🚀 Deploy Firmware', on_click=self.deploy_firmware).classes('btn btn-primary')
                     self.deploy_button.set_enabled(False)
             
             # Initial load
@@ -124,8 +129,9 @@ class DeviceTable:
     
     def update_table(self):
         """Update the device table with filtered data"""
+        # Only filter by device type since search is handled by table's built-in filter
         devices = self.device_manager.filter_devices(
-            search_query=self.search_query,
+            search_query=None,  # Don't filter by search query - the table handles this
             device_type=self.filter_type if self.filter_type != 'All types' else None
         )
         
@@ -160,7 +166,12 @@ class DeviceTable:
             self.selected_device = next((d for d in devices if d.port_name == port_name), None)
             
             if self.selected_device:
-                ui.notify(f'Selected: {self.selected_device.display_name}', type='info')
+                # Count how many devices have the same name
+                same_name_count = sum(1 for d in devices if d.display_name == self.selected_device.display_name)
+                if same_name_count > 1:
+                    ui.notify(f'Selected: {self.selected_device.display_name} ({same_name_count} devices with this name)', type='info')
+                else:
+                    ui.notify(f'Selected: {self.selected_device.display_name}', type='info')
             
             # Enable deploy button if firmware is selected
             if self.firmware_file_path and self.selected_device:
@@ -220,7 +231,7 @@ class DeviceTable:
             ui.notify(f'Selected: {result}', type='info')
     
     async def deploy_firmware(self):
-        """Deploy firmware to selected device"""
+        """Deploy firmware to selected device(s)"""
         if not self.selected_device:
             ui.notify('Please select a device first', type='warning')
             return
@@ -235,7 +246,16 @@ class DeviceTable:
         try:
             if self.on_deploy:
                 force = self.force_upload_checkbox.value
-                await self.on_deploy(self.selected_device, self.firmware_file_path, force)
+                batch_update = self.batch_update_checkbox.value
+                
+                if batch_update:
+                    # Find all devices with the same name
+                    all_devices = self.device_manager.get_devices()
+                    devices_to_update = [d for d in all_devices if d.display_name == self.selected_device.display_name]
+                    await self.on_deploy(devices_to_update, self.firmware_file_path, force)
+                else:
+                    # Single device update
+                    await self.on_deploy([self.selected_device], self.firmware_file_path, force)
         finally:
             # Re-enable button after deployment
             if self.selected_device and self.firmware_file_path:
