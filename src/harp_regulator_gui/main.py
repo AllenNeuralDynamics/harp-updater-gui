@@ -85,24 +85,25 @@ class HarpFirmwareUpdaterApp:
             else:
                 self.update_workflow.start_update(devices[0].display_name, firmware_path)
             
-            # Close any device connections by refreshing without connecting
+            # Step 1: Validate firmware file
+            self.update_workflow.push_log(f'Validating firmware file: {firmware_path}', LogLevel.INFO)
+
+            # Validate using firmware service
+            valid, error_msg = self.firmware_service.validate_firmware_file(devices[0].kind, firmware_path)
+            if not valid:
+                self.update_workflow.push_log(f'Invalid firmware file: {error_msg}', LogLevel.ERROR)
+                self.update_workflow.show_error(f'Invalid firmware file: {error_msg}')
+                ui.notify('Invalid firmware file', type='negative')
+                return
+            
+            self.update_workflow.push_log('Firmware file validated', LogLevel.SUCCESS)
+
+            # Step 1.5: Close any device connections by refreshing without connecting
             self.update_workflow.push_log('Closing device connections...', LogLevel.INFO)
             await run.cpu_bound(self.device_manager.refresh_devices, allow_connect=False)
             
             # Wait for OS to release port handles
             await run.io_bound(lambda: __import__('time').sleep(3))
-            
-            # Step 1: Validate firmware file
-            self.update_workflow.push_log(f'Validating firmware file: {firmware_path}', LogLevel.INFO)
-            
-            # Validate using firmware service
-            if not self.firmware_service.validate_firmware_file(firmware_path):
-                self.update_workflow.push_log('Invalid firmware file', LogLevel.ERROR)
-                self.update_workflow.show_error(f'Invalid firmware file. Must be .uf2 or .hex format: {firmware_path}')
-                ui.notify('Invalid firmware file', type='negative')
-                return
-            
-            self.update_workflow.push_log('Firmware file validated', LogLevel.SUCCESS)
             
             # Track results for batch updates
             success_count = 0

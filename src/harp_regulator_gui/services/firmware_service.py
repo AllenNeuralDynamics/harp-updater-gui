@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 from pathlib import Path
 from harp_regulator_gui.services.cli_wrapper import CLIWrapper
 from harp_regulator_gui.models.firmware import Firmware
+from harp_regulator_gui.models.device import Device
 
 
 class FirmwareService:
@@ -106,11 +107,12 @@ class FirmwareService:
         print(f"Would download {device_type} firmware {version} to {output_path}")
         return False
     
-    def validate_firmware_file(self, firmware_path: str) -> bool:
+    def validate_firmware_file(self, device_kind: str, firmware_path: str) -> tuple[bool, str]:
         """
         Validate that a firmware file exists and is the correct format
         
         Args:
+            device_kind: Kind of device (e.g., "Pico" or "ATxmega")
             firmware_path: Path to firmware file
             
         Returns:
@@ -119,14 +121,21 @@ class FirmwareService:
         path = Path(firmware_path)
         
         if not path.exists():
-            return False
+            return False, "Firmware file does not exist"
         
         ext = self.get_firmware_type(firmware_path)
         if ext not in ['.uf2', '.hex']:
-            return False
+            return False, "Unsupported firmware file type"
         
+        # Check compatibility based on device kind
+        if device_kind == "Pico" and ext != '.uf2':
+            return False, "Pico devices require .uf2 firmware files"
+
+        if device_kind == "ATxmega" and ext != '.hex':
+            return False, "ATxmega devices require .hex firmware files"
+
         # Could add more validation here (e.g., file size, magic bytes)
-        return True
+        return True, ""
     
     def fetch_available_firmware(self, device_id: str) -> List[str]:
         """
