@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Device(BaseModel):
@@ -23,7 +23,7 @@ class Device(BaseModel):
     confidence: str = Field(alias="Confidence", description="Device confidence level: High, Medium, Low")
     kind: str = Field(alias="Kind", description="Device kind: Pico, ATxmega, or Unknown")
     state: str = Field(alias="State", description="Device state: Online, Bootloader, DriverError, etc.")
-    port_name: str = Field(alias="PortName", description="COM port or device path")
+    port_name: Optional[str] = Field(None, alias="PortName", description="COM port or device path")
     who_am_i: Optional[int] = Field(None, alias="WhoAmI", description="Device WhoAmI register value")
     device_description: Optional[str] = Field(None, alias="DeviceDescription", description="Human-readable device name")
     serial_number: Optional[str] = Field(None, alias="SerialNumber", description="Device serial number")
@@ -40,6 +40,13 @@ class Device(BaseModel):
         if value is None:
             return value
         return str(value)
+    
+    @model_validator(mode="after")
+    def validate_port_name(self):
+        """Validate that port_name is provided unless device is in Bootloader state."""
+        if self.state != "Bootloader" and self.port_name is None:
+            raise ValueError(f"port_name is required when device state is '{self.state}'")
+        return self
         
     @property
     def display_name(self) -> str:
@@ -48,7 +55,9 @@ class Device(BaseModel):
             return self.device_description
         if self.who_am_i:
             return f"Device {self.who_am_i}"
-        return self.port_name
+        if self.port_name:
+            return f"Device on {self.port_name}"
+        return "Unknown Device"
     
     @property
     def health_status(self) -> str:
@@ -78,7 +87,9 @@ class Device(BaseModel):
     @property
     def metadata_line(self) -> str:
         """Get a formatted metadata line for display"""
-        parts = [self.port_name]
+        parts = []
+        if self.port_name:
+            parts.append(self.port_name)
         
         if self.hardware_version:
             parts.append(f"HW v{self.hardware_version}")

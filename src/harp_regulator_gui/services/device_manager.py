@@ -37,6 +37,7 @@ class DeviceManager:
                 self.devices.append(device)
             except Exception as e:
                 print(f"Error parsing device data: {e}")
+                print(f"Raw data: {data}")
                 continue
         
         return self.devices
