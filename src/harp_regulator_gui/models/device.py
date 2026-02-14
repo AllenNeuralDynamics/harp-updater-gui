@@ -43,8 +43,8 @@ class Device(BaseModel):
     
     @model_validator(mode="after")
     def validate_port_name(self):
-        """Validate that port_name is provided unless device is in Bootloader state."""
-        if self.state != "Bootloader" and self.port_name is None:
+        """Validate that port_name is provided unless device is in Bootloader or DriverError state."""
+        if self.state not in ["Bootloader", "DriverError"] and self.port_name is None:
             raise ValueError(f"port_name is required when device state is '{self.state}'")
         return self
         
