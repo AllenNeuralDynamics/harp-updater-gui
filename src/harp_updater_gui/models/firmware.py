@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 class Firmware(BaseModel):
     version: str
     compatible_hardware: List[str]
