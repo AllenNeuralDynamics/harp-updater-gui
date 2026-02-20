@@ -190,13 +190,13 @@ body, html {
 
 
 .q-tooltip {
-    background-color: color-mix(in srgb, var(--bg-primary) 25%, transparent);
+    background-color: color-mix(in srgb, var(--bg-primary) 35%, transparent);
     color: var(--text-secondary);
     max-width: 50%;
     font-size: 0.75rem;
     border: 1px solid var(--border-color);
-    backdrop-filter: blur(8px); 
-    -webkit-backdrop-filter: blur(8px); /* For compatibility with older Webkit browsers */
+    backdrop-filter: blur(5px); 
+    -webkit-backdrop-filter: blur(5px); /* For compatibility with older Webkit browsers */
     border-radius: 0.5rem;
     padding: 0.5rem;
     box-shadow: var(--shadow-md);

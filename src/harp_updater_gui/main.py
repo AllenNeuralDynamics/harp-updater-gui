@@ -6,19 +6,54 @@ A graphical user interface for managing Harp devices and updating firmware.
 Built with NiceGUI and integrating with the HarpRegulator CLI tool.
 """
 
+from multiprocessing import freeze_support
 import sys
+import logging
 from pathlib import Path
 from nicegui import ui, app, run
+from nicegui import core as nicegui_core
 from harp_updater_gui.components.header import Header
 from harp_updater_gui.components.device_table import DeviceTable
 from harp_updater_gui.components.update_workflow import UpdateWorkflow, LogLevel
 from harp_updater_gui.services.device_manager import DeviceManager
 from harp_updater_gui.services.firmware_service import FirmwareService
 from harp_updater_gui.models.device import Device
-from typing import List
+from typing import List, Optional
 
-# Get the path to the static directory
-STATIC_DIR = Path(__file__).parent / "static"
+
+def _resolve_static_dir() -> Optional[Path]:
+    """Resolve static directory for both source and frozen (PyInstaller) runs."""
+    candidates = [Path(__file__).resolve().parent / "static"]
+
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            meipass_path = Path(meipass)
+            candidates.extend(
+                [
+                    meipass_path / "static",
+                    meipass_path / "harp_updater_gui" / "static",
+                ]
+            )
+
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend(
+            [
+                exe_dir / "static",
+                exe_dir / "_internal" / "static",
+                exe_dir / "_internal" / "harp_updater_gui" / "static",
+            ]
+        )
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+
+    return None
+
+
+STATIC_DIR = _resolve_static_dir()
+_SHARED_CSS_INJECTED = False
 
 
 class HarpFirmwareUpdaterApp:
@@ -271,7 +306,7 @@ class HarpFirmwareUpdaterApp:
         # Main content area with device table and activity log
         with ui.element("div").classes("app-container"):
             # Use splitter for resizable device table and activity log
-            with ui.splitter(limits=(30, 80), value=75).classes("flex-1") as splitter:
+            with ui.splitter(limits=(30, 80), value=70).classes("flex-1") as splitter:
                 with splitter.before:
                     # Device table with integrated firmware upload
                     self.device_table = DeviceTable(
@@ -299,25 +334,32 @@ class HarpFirmwareUpdaterApp:
 
 def start_app():
     """Initialize and start the application."""
-    # Ensure NiceGUI error pages can locate the running script when launched via entrypoints
-    sys.argv[0] = str(Path(__file__).resolve())
+    css_content = None
+    if STATIC_DIR:
+        css_path = STATIC_DIR / "styles.css"
+        if css_path.exists():
+            with open(css_path, "r", encoding="utf-8") as f:
+                css_content = f.read()
 
-    # Add static files directory
-    app.add_static_files("/static", str(STATIC_DIR))
+    def root() -> None:
+        global _SHARED_CSS_INJECTED
+        if css_content and not _SHARED_CSS_INJECTED:
+            ui.add_head_html(f"<style>{css_content}</style>", shared=True)
+            _SHARED_CSS_INJECTED = True
 
-    # Load custom CSS
-    css_path = STATIC_DIR / "styles.css"
-    if css_path.exists():
-        with open(css_path, "r", encoding="utf-8") as f:
-            ui.add_head_html(f"<style>{f.read()}</style>")
+        app_instance = HarpFirmwareUpdaterApp()
+        app_instance.render()
 
-    # Create app instance and render UI
-    app_instance = HarpFirmwareUpdaterApp()
-    app_instance.render()
+    if nicegui_core.script_mode:
+        if nicegui_core.script_client is not None:
+            nicegui_core.script_client.delete()
+            nicegui_core.script_client = None
+        nicegui_core.script_mode = False
 
     # Run the application
     try:
         ui.run(
+            root=root,
             title="Harp Updater GUI",
             favicon="🔧",
             host="0.0.0.0",
@@ -326,15 +368,21 @@ def start_app():
             reload=False,
             show=True,
             native=True,
-            window_size=(1200, 1000),
+            window_size=(1350, 1000),
         )
     except KeyboardInterrupt:
         # Clean shutdown on Ctrl+C
         pass
 
+# Add static files directory if present
+if STATIC_DIR:
+    app.add_static_files("/static", str(STATIC_DIR))
+else:
+    logging.warning("Static assets directory not found; continuing without /static.")
 
 # Start the app when executed directly.
 # Do not start on "__mp_main__" because Windows multiprocessing workers
 # (used by run.cpu_bound) import this module under that name.
 if __name__ == "__main__":
+    freeze_support()  # For PyInstaller compatibility
     start_app()
