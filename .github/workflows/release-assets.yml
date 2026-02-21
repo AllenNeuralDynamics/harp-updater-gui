@@ -63,18 +63,30 @@ jobs:
         shell: python
         run: |
           import os
+          import pathlib
+          import tomllib
+
+          pyproject = pathlib.Path('pyproject.toml')
+          data = tomllib.loads(pyproject.read_text(encoding='utf-8'))
+          app_version = data['project']['version']
 
           if os.environ.get('GITHUB_EVENT_NAME') == 'release':
-              tag = os.environ.get('GITHUB_REF_NAME', 'manual-release')
+            release_tag = os.environ.get('GITHUB_REF_NAME', 'manual-release')
+            if app_version in release_tag:
+              tag = release_tag
+            else:
+              tag = f"v{app_version}-{release_tag}"
           else:
               run_number = os.environ['GITHUB_RUN_NUMBER']
               run_attempt = os.environ['GITHUB_RUN_ATTEMPT']
-              tag = f"build-{run_number}.{run_attempt}"
+            tag = f"v{app_version}-build-{run_number}.{run_attempt}"
 
           zip_name = f"harp_updater_gui-{tag}.zip"
+          artifact_name = f"harp_updater_gui-{tag}"
 
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
               out.write(f"zip_name={zip_name}\n")
+            out.write(f"artifact_name={artifact_name}\n")
 
       - name: Build executable from spec
         run: uv run pyinstaller harp_updater_gui.spec
@@ -85,11 +97,11 @@ jobs:
           New-Item -Path dist -ItemType Directory -Force | Out-Null
           Compress-Archive -Path dist/harp_updater_gui/* -DestinationPath "dist/${{ steps.meta.outputs.zip_name }}" -Force
 
-      - name: Upload zip as workflow artifact
+      - name: Upload build folder as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.zip_name }}
-          path: dist/${{ steps.meta.outputs.zip_name }}
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: dist/harp_updater_gui/**
 
       - name: Upload zip to manually created release
         if: github.event_name == 'release'
