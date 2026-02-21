@@ -1,5 +1,7 @@
 from nicegui import ui
 import platform
+import importlib.metadata
+
 
 
 class Header:
@@ -18,6 +20,7 @@ class Header:
                 with ui.row().classes("items-center"):
                     ui.image("/static/app_icon.png").classes("w-16")
                     ui.label("Harp Updater GUI").classes("header-title")
+                    ui.label(f"v{importlib.metadata.version('harp_updater_gui')}").classes("text-xs self-end pb-4")
                 with ui.row().classes("items-center gap-4"):
                     ui.label(f"Connected to {self.host_name}").classes(
                         "header-subtitle"
