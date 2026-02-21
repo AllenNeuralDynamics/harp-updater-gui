@@ -39,7 +39,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['src\\harp_updater_gui\\static\\app_icon_color.png'],
+    icon=['src\\harp_updater_gui\\static\\app_icon_color.ico'],
 )
 coll = COLLECT(
     exe,
