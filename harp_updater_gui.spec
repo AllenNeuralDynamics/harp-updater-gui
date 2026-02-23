@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import nicegui
 import os
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # Function to get the nicegui base path dynamically
 def get_nicegui_path():
@@ -12,8 +13,17 @@ a = Analysis(
     ['src\\harp_updater_gui\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[(get_nicegui_path(), 'nicegui'), ('src/harp_updater_gui/static', 'static'), ('deps/harp_regulator', 'harp_regulator')],
-    hiddenimports=[],
+    datas=[
+        (get_nicegui_path(), 'nicegui'),
+        ('src/harp_updater_gui/static', 'static'),
+        ('deps/harp_regulator', 'harp_regulator'),
+        *collect_data_files('webview', include_py_files=True),
+    ],
+    hiddenimports=[
+        *collect_submodules('webview.platforms'),
+        *collect_submodules('pythonnet'),
+        *collect_submodules('clr_loader'),
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
