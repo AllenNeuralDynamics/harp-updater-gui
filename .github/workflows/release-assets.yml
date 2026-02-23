@@ -86,7 +86,7 @@ jobs:
 
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
               out.write(f"zip_name={zip_name}\n")
-            out.write(f"artifact_name={artifact_name}\n")
+              out.write(f"artifact_name={artifact_name}\n")
 
       - name: Build executable from spec
         run: uv run pyinstaller harp_updater_gui.spec

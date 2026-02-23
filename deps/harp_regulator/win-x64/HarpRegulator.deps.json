@@ -12,163 +12,23 @@
           "Bonsai.Harp": "3.6.1",
           "Harp.Devices": "1.0.0",
           "Harp.Protocol": "1.0.0",
-          "Microsoft.NET.ILLink.Tasks": "8.0.24",
           "PicobootConnection": "1.0.0",
-          "System.IO.Ports": "9.0.6",
-          "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "8.0.24"
+          "System.IO.Ports": "9.0.6"
         },
         "runtime": {
           "HarpRegulator.dll": {}
-        }
-      },
-      "runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.24": {
-        "runtime": {
-          "Microsoft.Win32.Registry.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Collections.Concurrent.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Collections.Immutable.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Collections.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.ComponentModel.Primitives.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.ComponentModel.TypeConverter.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Console.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Diagnostics.StackTrace.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Diagnostics.TextWriterTraceListener.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Diagnostics.TraceSource.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.IO.Compression.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.IO.FileSystem.DriveInfo.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.IO.MemoryMappedFiles.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Linq.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Memory.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.ObjectModel.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Private.CoreLib.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Reflection.Metadata.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Security.Claims.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Security.Principal.Windows.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Text.Encodings.Web.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Text.Json.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.Text.RegularExpressions.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          },
-          "System.dll": {
-            "assemblyVersion": "4.0.0.0",
-            "fileVersion": "8.0.2426.7010"
-          }
-        },
-        "native": {
-          "Microsoft.DiaSymReader.Native.amd64.dll": {
-            "fileVersion": "14.42.34436.0"
-          },
-          "System.IO.Compression.Native.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "clretwrc.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "clrgc.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "clrjit.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "coreclr.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "createdump.exe": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "hostfxr.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "hostpolicy.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "mscordaccore.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "mscordaccore_amd64_amd64_8.0.2426.7010.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "mscordbi.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "mscorrc.dll": {
-            "fileVersion": "8.0.2426.7010"
-          },
-          "msquic.dll": {
-            "fileVersion": "2.4.8.0"
-          }
         }
       },
       "Bonsai.Core/2.8.0": {
         "dependencies": {
           "System.CodeDom": "6.0.0",
           "System.Reactive": "6.0.0"
+        },
+        "runtime": {
+          "lib/net6.0/Bonsai.Core.dll": {
+            "assemblyVersion": "2.8.0.0",
+            "fileVersion": "2.8.0.4248"
+          }
         }
       },
       "Bonsai.Harp/3.6.1": {
@@ -187,9 +47,14 @@
         "dependencies": {
           "Bonsai.Core": "2.8.0",
           "System.IO.Ports": "9.0.6"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Bonsai.System.dll": {
+            "assemblyVersion": "2.8.0.0",
+            "fileVersion": "2.8.0.4248"
+          }
         }
       },
-      "Microsoft.NET.ILLink.Tasks/8.0.24": {},
       "runtime.android-arm.runtime.native.System.IO.Ports/9.0.6": {},
       "runtime.android-arm64.runtime.native.System.IO.Ports/9.0.6": {},
       "runtime.android-x64.runtime.native.System.IO.Ports/9.0.6": {},
@@ -226,7 +91,14 @@
       },
       "runtime.osx-arm64.runtime.native.System.IO.Ports/9.0.6": {},
       "runtime.osx-x64.runtime.native.System.IO.Ports/9.0.6": {},
-      "System.CodeDom/6.0.0": {},
+      "System.CodeDom/6.0.0": {
+        "runtime": {
+          "lib/net6.0/System.CodeDom.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
       "System.IO.Ports/9.0.6": {
         "dependencies": {
           "runtime.native.System.IO.Ports": "9.0.6"
@@ -286,11 +158,6 @@
       "serviceable": false,
       "sha512": ""
     },
-    "runtimepack.Microsoft.NETCore.App.Runtime.win-x64/8.0.24": {
-      "type": "runtimepack",
-      "serviceable": false,
-      "sha512": ""
-    },
     "Bonsai.Core/2.8.0": {
       "type": "package",
       "serviceable": true,
@@ -311,13 +178,6 @@
       "sha512": "sha512-U+o1jH5eY5MdkxPk68umQpf1Jjroy71w86ZEktdFj/FwJJSJpa+b2cNzjv01IHAE4aYUzqIgNJyvWDlSBadx/Q==",
       "path": "bonsai.system/2.8.0",
       "hashPath": "bonsai.system.2.8.0.nupkg.sha512"
-    },
-    "Microsoft.NET.ILLink.Tasks/8.0.24": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-1gnadp//+DoGJvV4AFdzPqYPxkypaWYjYMCr7KAacV0iadsHz1nU+rrkoxBCna4FCmeKH49CisEwa7g94/MbEg==",
-      "path": "microsoft.net.illink.tasks/8.0.24",
-      "hashPath": "microsoft.net.illink.tasks.8.0.24.nupkg.sha512"
     },
     "runtime.android-arm.runtime.native.System.IO.Ports/9.0.6": {
       "type": "package",
@@ -474,12 +334,5 @@
       "serviceable": false,
       "sha512": ""
     }
-  },
-  "runtimes": {
-    "win-x64": [
-      "win",
-      "any",
-      "base"
-    ]
   }
 }
