@@ -1,7 +1,11 @@
 name: Build and Release Assets
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
   release:
@@ -13,39 +17,16 @@ permissions:
   contents: write
 
 jobs:
-  lint_and_test:
-    name: Lint and test
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Run tests
-        run: uv run pytest
-
   build_zip:
     name: Build and upload zip artifact
-    needs: lint_and_test
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -79,7 +60,7 @@ jobs:
           else:
               run_number = os.environ['GITHUB_RUN_NUMBER']
               run_attempt = os.environ['GITHUB_RUN_ATTEMPT']
-            tag = f"v{app_version}-build-{run_number}.{run_attempt}"
+              tag = f"v{app_version}-build-{run_number}.{run_attempt}"
 
           zip_name = f"harp_updater_gui-{tag}.zip"
           artifact_name = f"harp_updater_gui-{tag}"
