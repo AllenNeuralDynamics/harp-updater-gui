@@ -8,7 +8,6 @@ Please collect:
 
 - OS version (Windows/macOS/Linux)
 - App version or commit SHA
-- HarpRegulator version
 - Device model/type and connection method
 - Exact steps to reproduce
 - Expected vs actual behavior
@@ -30,7 +29,6 @@ A short description of the problem.
 ## Environment
 - OS:
 - App version/commit:
-- HarpRegulator version:
 - Device type:
 
 ## Steps to reproduce

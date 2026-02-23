@@ -2,6 +2,12 @@
 
 Desktop GUI for updating Harp device firmware using the HarpRegulator CLI. The app is built with NiceGUI, runs in native window mode via `pywebview`, and includes an integrated device table + activity log workflow.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/source/_static/app_screenshot_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/source/_static/app_screenshot_light.png">
+  <img alt="Fallback image description" src="docs/source/_static/app_screenshot_light.png">
+</picture>
+
 ## Current Features
 
 - Device discovery and refresh using `HarpRegulator list --json`

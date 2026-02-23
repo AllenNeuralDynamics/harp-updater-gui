@@ -43,9 +43,14 @@ myst_heading_anchors = 3
 
 html_theme = "furo"
 html_static_path = ["_static"]
-html_title = "Harp Updater GUI"
+html_title = "Harp Updater GUI Docs"
 html_favicon = "_static/app_icon_color.ico"
 html_logo = "_static/app_icon_color.ico"
+html_theme_options = {
+    "source_repository": "https://github.com/AllenNeuralDynamics/harp-updater-gui/",
+    "source_branch": "main",
+    "source_directory": "docs/source/",
+}
 
 
 def setup(app):
