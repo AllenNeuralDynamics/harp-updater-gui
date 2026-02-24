@@ -18,6 +18,10 @@ from harp_updater_gui.components.device_table import DeviceTable
 from harp_updater_gui.components.update_workflow import UpdateWorkflow, LogLevel
 from harp_updater_gui.services.device_manager import DeviceManager
 from harp_updater_gui.services.firmware_service import FirmwareService
+from harp_updater_gui.utils.update_audit_logger import (
+    log_successful_firmware_update,
+    setup_update_audit_logger,
+)
 from harp_updater_gui.models.device import Device
 from typing import List, Optional
 
@@ -78,6 +82,7 @@ class HarpFirmwareUpdaterApp:
         # Initialize services
         self.device_manager = DeviceManager(self.regulator_path)
         self.firmware_service = FirmwareService(self.regulator_path)
+        self.audit_logger = setup_update_audit_logger()
 
         # Initialize components (will be set in render)
         self.header = None
@@ -172,9 +177,11 @@ class HarpFirmwareUpdaterApp:
             # Track results for batch updates
             success_count = 0
             fail_count = 0
+            successful_updates: list[dict[str, str]] = []
 
             # Step 2: Flash firmware to each device
             for idx, device in enumerate(devices, 1):
+                previous_firmware_version = device.firmware_version or "unknown"
                 if is_batch:
                     upload_label.set_text(
                         f"Uploading firmware ({idx}/{total_devices})..."
@@ -205,6 +212,13 @@ class HarpFirmwareUpdaterApp:
 
                 if success:
                     success_count += 1
+                    successful_updates.append(
+                        {
+                            "device_name": device.display_name,
+                            "port_name": device.port_name,
+                            "previous_firmware_version": previous_firmware_version,
+                        }
+                    )
                     self.update_workflow.push_log(
                         f"Firmware uploaded successfully to {device.display_name}",
                         LogLevel.SUCCESS,
@@ -272,8 +286,35 @@ class HarpFirmwareUpdaterApp:
                 self.update_workflow.push_log("Firmware verified", LogLevel.SUCCESS)
                 self.update_workflow.complete_update(True)
 
+            # Close loading dialog
+            loading_dialog.close()
+
             # Refresh device table to get updated info
-            await self.device_table.refresh_devices()
+            await self.device_table.refresh_devices(False)
+
+            refreshed_devices = {
+                d.port_name: (d.firmware_version or "unknown")
+                for d in self.device_manager.get_devices()
+            }
+            for update in successful_updates:
+                new_firmware_version = refreshed_devices.get(
+                    update["port_name"], "unknown"
+                )
+                try:
+                    log_successful_firmware_update(
+                        logger=self.audit_logger,
+                        device_name=update["device_name"],
+                        port_name=update["port_name"],
+                        previous_firmware_version=update[
+                            "previous_firmware_version"
+                        ],
+                        new_firmware_version=new_firmware_version,
+                    )
+                except Exception as logging_error:
+                    self.update_workflow.push_log(
+                        f"Audit logging failed for {update['device_name']}: {logging_error}",
+                        LogLevel.WARNING,
+                    )
 
         except Exception as e:
             self.update_workflow.push_log(
