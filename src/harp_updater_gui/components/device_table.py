@@ -1,6 +1,7 @@
 from nicegui import ui, app, run
 from typing import Optional, Callable
 from pathlib import Path
+import platform
 from harp_updater_gui.models.device import Device
 from harp_updater_gui.services.device_manager import DeviceManager
 from harp_updater_gui.services.firmware_service import FirmwareService
@@ -39,9 +40,22 @@ class DeviceTable:
         self.refresh_button = None
         self.refresh_dialog = None
         self.is_refreshing = False
+        self.install_drivers_button = None
+        self.install_drivers_container = None
+        self.is_installing_drivers = False
+        self.activity_logger: Optional[Callable[[str, str], None]] = None
 
         # Search and filter state
         self.filter_type = "All types"
+
+    def set_activity_logger(self, callback: Callable[[str, str], None]):
+        """Set callback used to send messages to the activity log panel."""
+        self.activity_logger = callback
+
+    def _log_activity(self, message: str, level: str = "info"):
+        """Forward activity messages to the shared workflow log if available."""
+        if self.activity_logger:
+            self.activity_logger(message, level)
 
     def _get_deploy_eligibility(self) -> tuple[bool, Optional[str]]:
         """Evaluate whether firmware deployment is currently allowed."""
@@ -120,7 +134,9 @@ class DeviceTable:
                 ui.label("Refreshing devices...").classes("text-base mt-3")
 
             # Refresh behavior controls
-            with ui.row().classes("w-full items-center justify-end mb-2"):
+            with ui.row().classes("w-full items-center justify-end gap-3 mb-2"):
+                self.install_drivers_container = ui.row().classes("gap-2")
+
                 self.connect_all_on_refresh_checkbox = ui.checkbox(
                     "Connect all"
                 ).tooltip(
@@ -238,6 +254,76 @@ class DeviceTable:
             # Initial load
             ui.timer(0.1, self._initial_refresh, once=True)
 
+    def _has_driver_error_devices(self) -> bool:
+        """Return True when at least one connected device is in DriverError state."""
+        if platform.system() != "Windows":
+            return False
+
+        return any(
+            device.state == "DriverError" for device in self.device_manager.get_devices()
+        )
+
+    def _render_driver_install_action(self):
+        """Render or hide driver install action based on current device states."""
+        if self.install_drivers_container is None:
+            return
+
+        self.install_drivers_container.clear()
+        self.install_drivers_button = None
+
+        if not self._has_driver_error_devices():
+            return
+
+        with self.install_drivers_container:
+            self.install_drivers_button = ui.button(
+                "🛠 Install Drivers", on_click=self.install_drivers
+            ).classes("btn btn-secondary")
+            self.install_drivers_button.tooltip(
+                "Run HarpRegulator install-drivers to resolve DriverError devices"
+            )
+
+    async def install_drivers(self):
+        """Install required device drivers and refresh the device list."""
+        if self.is_installing_drivers:
+            return
+
+        self.is_installing_drivers = True
+        self._log_activity("Starting driver installation via HarpRegulator", "info")
+        if self.install_drivers_button:
+            self.install_drivers_button.set_enabled(False)
+
+        with ui.dialog() as install_dialog, ui.card().classes("items-center p-6"):
+            ui.spinner(size="lg", color="primary")
+            ui.label("Installing device drivers...").classes("text-base mt-3")
+            ui.label("You may see a Windows UAC prompt.").classes("text-sm text-secondary")
+
+        install_dialog.open()
+
+        try:
+            success, output = await run.cpu_bound(self.device_manager.install_drivers)
+
+            if success:
+                ui.notify("Driver installation completed", type="positive")
+                self._log_activity("Driver installation completed", "success")
+                if output and output.strip():
+                    ui.notify("HarpRegulator reported success", type="info")
+            else:
+                error_text = output.strip() if output else "Unknown error"
+                ui.notify(f"Driver installation failed: {error_text}", type="negative")
+                self._log_activity(
+                    f"Driver installation failed: {error_text}", "error"
+                )
+
+            await self.refresh_devices(show_notification=False)
+        except Exception as e:
+            ui.notify(f"Driver installation error: {str(e)}", type="negative")
+            self._log_activity(f"Driver installation error: {str(e)}", "error")
+        finally:
+            install_dialog.close()
+            self.is_installing_drivers = False
+            if self.install_drivers_button:
+                self.install_drivers_button.set_enabled(True)
+
     async def _initial_refresh(self):
         """Run initial refresh after UI has mounted."""
         await self.refresh_devices(show_notification=False)
@@ -322,6 +408,7 @@ class DeviceTable:
 
         self.table.rows = rows
         self.table.update()
+        self._render_driver_install_action()
 
         # Enable deploy button if firmware is selected
         if self.firmware_file_path and self.selected_device:

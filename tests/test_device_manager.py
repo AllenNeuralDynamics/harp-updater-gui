@@ -120,3 +120,18 @@ def test_select_device(device_manager, mocker, sample_device_data):
     assert selected is not None
     assert selected.port_name == "COM5"
     assert selected.display_name == "EnvironmentSensor"
+
+
+def test_install_drivers_delegates_to_cli(device_manager, mocker):
+    """Test that driver installation delegates to CLI wrapper."""
+    mock_install = mocker.patch.object(
+        device_manager.cli,
+        "install_drivers",
+        return_value=(True, "Drivers installed"),
+    )
+
+    success, output = device_manager.install_drivers()
+
+    assert success is True
+    assert output == "Drivers installed"
+    mock_install.assert_called_once_with()

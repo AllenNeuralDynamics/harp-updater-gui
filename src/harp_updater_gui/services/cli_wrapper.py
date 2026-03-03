@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from typing import List, Dict, Any, Optional
 
@@ -34,6 +35,51 @@ class CLIWrapper:
             text=True,
             check=True,
             **self._subprocess_kwargs,
+        )
+
+    def _run_elevated_windows(self, args: List[str]) -> tuple[bool, str]:
+        """Run a command elevated via UAC on Windows and wait for completion."""
+        escaped_path = self.cli_path.replace("'", "''")
+        escaped_args = [arg.replace("'", "''") for arg in args]
+        quoted_args = ", ".join(f"'{arg}'" for arg in escaped_args)
+        script = (
+            f"$p = Start-Process -FilePath '{escaped_path}' "
+            f"-ArgumentList @({quoted_args}) -Verb RunAs -Wait -PassThru; "
+            "exit $p.ExitCode"
+        )
+
+        try:
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    script,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+                **self._subprocess_kwargs,
+            )
+        except Exception as e:
+            return False, f"Failed to request administrator privileges: {e}"
+
+        if result.returncode == 0:
+            return True, "Driver installation completed successfully."
+
+        if result.returncode == 1223:
+            return False, "Driver installation was canceled at the UAC prompt."
+
+        error_output = (result.stderr or result.stdout or "").strip()
+        if error_output:
+            return False, error_output
+
+        return (
+            False,
+            f"Driver installation failed with exit code {result.returncode}.",
         )
 
     def list_devices(
@@ -155,6 +201,12 @@ class CLIWrapper:
         Returns:
             Tuple of (success: bool, output: str)
         """
+        if os.name != "nt":
+            return True, "Driver installation is only required on Windows; skipped."
+
+        if os.name == "nt":
+            return self._run_elevated_windows(["install-drivers"])
+
         cmd = [self.cli_path, "install-drivers"]
 
         try:

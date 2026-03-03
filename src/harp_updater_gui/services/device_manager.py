@@ -143,3 +143,7 @@ class DeviceManager:
         )
 
         return success, output
+
+    def install_drivers(self) -> tuple[bool, str]:
+        """Install drivers using HarpRegulator."""
+        return self.cli.install_drivers()

@@ -326,6 +326,21 @@ class HarpFirmwareUpdaterApp:
             # Close loading dialog
             loading_dialog.close()
 
+    def on_driver_action_log(self, message: str, level: str = "info"):
+        """Forward driver installation messages to the activity log panel."""
+        if not self.update_workflow:
+            return
+
+        level_mapping = {
+            "info": LogLevel.INFO,
+            "success": LogLevel.SUCCESS,
+            "warning": LogLevel.WARNING,
+            "error": LogLevel.ERROR,
+            "debug": LogLevel.DEBUG,
+        }
+        mapped_level = level_mapping.get(level.lower(), LogLevel.INFO)
+        self.update_workflow.push_log(message, mapped_level)
+
     def render(self):
         """Render the main application UI"""
         # Configure NiceGUI color theme
@@ -362,6 +377,8 @@ class HarpFirmwareUpdaterApp:
                     # Activity log
                     self.update_workflow = UpdateWorkflow()
                     self.update_workflow.render()
+
+                self.device_table.set_activity_logger(self.on_driver_action_log)
 
                 with splitter.separator:
                     ui.icon(name="drag_indicator", size="sm", color="accent")

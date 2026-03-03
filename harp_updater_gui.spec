@@ -41,6 +41,7 @@ exe = EXE(
     name='harp_updater_gui',
     debug=False,
     bootloader_ignore_signals=False,
+    uac_admin=True,
     strip=False,
     upx=True,
     console=False,
