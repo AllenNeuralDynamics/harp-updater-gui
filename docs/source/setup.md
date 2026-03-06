@@ -7,15 +7,23 @@ This page walks through setup from scratch.
 This is the fastest path if you only need to run the app.
 
 1. Go to the app's GitHub [releases](https://github.com/AllenNeuralDynamics/harp-updater-gui/releases) page
-2. Download the latest release zip (for example `harp_updater_gui-vX.Y.Z.zip`)
-3. After downloading, right-click the zip file → Properties → Unblock before extracting
-4. Extract to a local folder (for example `C:\Apps\harp_updater_gui`)
-5. Double-click `harp_updater_gui.exe`
+2. Download either:
+	- Installer: `harp_updater_gui-installer-<tag>.exe` (recommended)
+	- Portable zip: `harp_updater_gui-<tag>.zip`
+3. If using the installer, run it. The installer automatically checks for .NET 8 Desktop Runtime and downloads/installs it if needed.
+4. If using zip, right-click the zip file → Properties → Unblock before extracting.
+5. Launch `harp_updater_gui.exe`.
 
-Important:
+```{important}
+For the portable zip distribution, always **Unblock** the zip file before extraction (see step 4 above).
+Otherwise Windows may propagate download security metadata and block the extracted app or dependencies.
+```
+
+Notes:
 
 - Keep the extracted folder structure intact (`harp_updater_gui.exe` + `_internal`)
-- Install [Microsoft .NET 8.0 Desktop Runtime (x64)](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime/desktop)
+- If using the installer, .NET 8 Desktop Runtime is checked automatically and installed when missing.
+- If using zip, install [Microsoft .NET 8.0 Desktop Runtime (x64)](https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime/desktop)
 - If SmartScreen appears, verify source and allow execution
 - If a browser opens on `localhost` but no native window appears, install WebView2 Runtime and .NET Desktop Runtime (x64)
 

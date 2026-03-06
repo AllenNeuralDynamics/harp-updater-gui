@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build_zip:
-    name: Build and upload zip artifact
+    name: Build and upload Windows artifacts
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
 
@@ -64,13 +64,26 @@ jobs:
 
           zip_name = f"harp_updater_gui-{tag}.zip"
           artifact_name = f"harp_updater_gui-{tag}"
+          installer_name = f"harp_updater_gui-installer-{tag}.exe"
 
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f"app_version={app_version}\n")
+              out.write(f"tag={tag}\n")
               out.write(f"zip_name={zip_name}\n")
               out.write(f"artifact_name={artifact_name}\n")
+              out.write(f"installer_name={installer_name}\n")
 
       - name: Build executable from spec
         run: uv run pyinstaller harp_updater_gui.spec
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $installerBase = [System.IO.Path]::GetFileNameWithoutExtension("${{ steps.meta.outputs.installer_name }}")
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=${{ steps.meta.outputs.app_version }}" `
+            "/DInstallerOutputBaseFilename=$installerBase" `
+            "installer\harp_updater_gui.iss"
 
       - name: Zip build output
         shell: pwsh
@@ -78,17 +91,25 @@ jobs:
           New-Item -Path dist -ItemType Directory -Force | Out-Null
           Compress-Archive -Path dist/harp_updater_gui/* -DestinationPath "dist/${{ steps.meta.outputs.zip_name }}" -Force
 
-      - name: Upload build folder as workflow artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload zip as workflow artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.meta.outputs.artifact_name }}
-          path: dist/harp_updater_gui/**
+          archive: false
+          path: dist/${{ steps.meta.outputs.zip_name }}
+
+      - name: Upload installer as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: dist/installer/${{ steps.meta.outputs.installer_name }}
 
       - name: Upload zip to manually created release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: dist/${{ steps.meta.outputs.zip_name }}
+          files: |
+            dist/${{ steps.meta.outputs.zip_name }}
+            dist/installer/${{ steps.meta.outputs.installer_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

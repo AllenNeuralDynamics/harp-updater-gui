@@ -2,6 +2,19 @@
 
 Get the current app running in a few minutes.
 
+## Option A: Use pre-built binaries (Windows)
+
+1. Open: https://github.com/AllenNeuralDynamics/harp-updater-gui/releases
+2. Download either:
+	- Installer: `harp_updater_gui-installer-<tag>.exe` (recommended)
+	- Portable zip: `harp_updater_gui-<tag>.zip`
+3. If using the installer, run it. The installer auto-checks for .NET 8 Desktop Runtime and downloads/installs it if needed.
+4. If using zip, **unblock** the zip before extraction (see warning below), then run `harp_updater_gui.exe`.
+
+> [!IMPORTANT]
+> For the **portable zip** package, right-click the zip file → **Properties** → **Unblock** before extracting.
+> This prevents Windows security metadata from blocking the extracted executable/dependencies.
+
 ## Prerequisites
 
 1. Python `>=3.11,<4.0` (3.12 recommended)

@@ -36,15 +36,27 @@ This repository uses [uv](https://docs.astral.sh/uv/).
 If you do not want to install Python, download the packaged app from GitHub Releases:
 
 1. Open: https://github.com/AllenNeuralDynamics/harp-updater-gui/releases
-2. Download the latest Windows release asset zip (for example `harp_updater_gui-vX.Y.Z.zip`).
-3. If it came from a zip, right-click zip → Properties → Unblock before extracting.
+2. Download either:
+  - Installer: `harp_updater_gui-installer-<tag>.exe` (recommended)
+  - Portable zip: `harp_updater_gui-<tag>.zip`
+3. If using the portable zip, right-click the zip → **Properties** → **Unblock** before extracting.
 4. Extract the zip to a local folder (for example `C:\Apps\harp_updater_gui`).
 5. Run `harp_updater_gui.exe`.
+
+Installer notes:
+
+- The installer automatically checks whether Microsoft .NET 8 Desktop Runtime (x64) is present.
+- If missing, the installer downloads and installs the runtime during setup.
+- Runtime installation may prompt for administrator/UAC approval.
+
+> [!IMPORTANT]
+> For the **portable zip** distribution, always click **Unblock** in file properties before extraction.
+> If you skip this, Windows may propagate the "downloaded from internet" flag to extracted files and block `harp_updater_gui.exe` or bundled dependencies.
 
 Notes:
 
 - Keep `harp_updater_gui.exe` and `_internal` in the same folder structure after extraction.
-- Install Microsoft .NET 8.0 Desktop Runtime (x64): https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime/desktop
+- If using the portable zip, install Microsoft .NET 8 Desktop Runtime (x64): https://dotnet.microsoft.com/en-us/download/dotnet/8.0/runtime/desktop
 - If Windows SmartScreen appears, click **More info** → **Run anyway** (only if the source is trusted).
 - If native window mode fails to open, see Troubleshooting below.
 
