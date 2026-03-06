@@ -23,21 +23,21 @@ AppPublisherURL=https://www.alleninstitute.org/
 DefaultDirName={autopf}\AllenInstitute\Harp Updater GUI
 DefaultGroupName=Harp Updater GUI
 AllowNoIcons=yes
-OutputDir=dist\installer
+OutputDir=..\dist\installer
 OutputBaseFilename={#InstallerOutputBaseFilename}
 SolidCompression=yes
 WizardStyle=modern dynamic
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
-SetupIconFile=src\harp_updater_gui\static\app_icon_color.ico
+SetupIconFile=..\src\harp_updater_gui\static\app_icon_color.ico
 UninstallDisplayIcon={app}\harp_updater_gui.exe
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
-Source: "dist\harp_updater_gui\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\harp_updater_gui\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\Harp Updater GUI"; Filename: "{app}\harp_updater_gui.exe"
