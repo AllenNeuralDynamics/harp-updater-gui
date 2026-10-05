@@ -153,6 +153,7 @@ class CLIWrapper:
         progress: bool = True,
         no_reboot: bool = False,
         verbose: bool = False,
+        no_upload: bool = False,
     ) -> tuple[bool, str]:
         """
         Upload firmware to a Harp device
@@ -165,6 +166,7 @@ class CLIWrapper:
             progress: Show progress bars
             no_reboot: Don't reboot after upload
             verbose: Show verbose output
+            no_upload: Validate ATxmega firmware without connecting to a device
         Returns:
             Tuple of (success: bool, output: str)
         """
@@ -187,12 +189,20 @@ class CLIWrapper:
         if verbose:
             cmd.append("--verbose")
 
+        if no_upload:
+            cmd.append("--no-upload")
+
         try:
             result = self._run_command(cmd)
             return True, result.stdout
 
         except subprocess.CalledProcessError as e:
-            return False, e.stderr
+            output = "\n".join(
+                stream.strip()
+                for stream in (e.stdout, e.stderr)
+                if stream and stream.strip()
+            )
+            return False, output or f"Firmware upload failed with exit code {e.returncode}."
 
     def install_drivers(self) -> tuple[bool, str]:
         """

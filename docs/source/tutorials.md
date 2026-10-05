@@ -21,6 +21,12 @@ This section covers the core workflows in the app.
    - Activity log panel
 6. After completion, wait for automatic table refresh.
 
+For ATxmega, keep the original metadata filename, such as
+`Behavior-fw3.3-harp1.15-hw2.0-ass0.hex`. The GUI validates the filename and HEX
+checksums without connecting, then Regulator checks device compatibility before reset.
+The upload dialog remains open through the device restart check (up to 20 seconds).
+Stage output appears in the activity log when the command returns.
+
 ## Tutorial 3: Batch update by device name
 
 1. Select one device from the target group.
@@ -28,6 +34,8 @@ This section covers the core workflows in the app.
 3. Select firmware file.
 4. Click **Deploy Firmware**.
 5. Watch per-device results in the activity log.
+
+All devices in a batch must have the same kind (Pico or ATxmega).
 
 ## Tutorial 4: Use activity logs for troubleshooting
 

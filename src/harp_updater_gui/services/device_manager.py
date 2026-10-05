@@ -129,6 +129,9 @@ class DeviceManager:
         """
         target = device.port_name
 
+        if device.kind == "ATxmega" and not target:
+            return False, "ATxmega firmware uploads require a serial port."
+
         # Use PICOBOOT if device is in bootloader state and is Pico
         if device.state == "Bootloader" and device.kind == "Pico":
             target = "PICOBOOT"
@@ -138,7 +141,7 @@ class DeviceManager:
             target=target,
             force=force,
             no_interactive=True,
-            progress=False,
+            progress=device.kind == "ATxmega",
             verbose=force,
         )
 

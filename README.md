@@ -22,10 +22,12 @@ Desktop GUI for updating Harp device firmware using the HarpRegulator CLI. The a
 ## Prerequisites
 
 - Python `>=3.11,<4.0` (3.12 recommended)
-- HarpRegulator CLI available on your machine
+- HarpRegulator CLI and dependencies (already included in the repository)
 - Connected Harp devices
 
-> **Important:** The current code initializes `DeviceManager`/`FirmwareService` with a hardcoded Windows path in `src/harp_updater_gui/main.py`. Update that path for your environment before running outside the original developer machine.
+The app uses `HarpRegulator.exe` from PATH when available, otherwise the bundled
+`deps/harp_regulator/win-x64` directory (or `_internal/harp_regulator/win-x64` in packaged builds).
+An executable on PATH must support the same ATxmega validation and readiness behavior.
 
 ## Installation
 
@@ -79,6 +81,11 @@ cd harp-updater-gui
 uv sync
 ```
 
+HarpRegulator and its dependencies are already shipped in `deps/harp_regulator/win-x64`.
+Release builds package this directory as-is; no regulator source checkout or rebuild is required.
+Keep the complete directory, including `Harp.Toolkit.Core.dll`, Bonsai dependencies,
+and native libraries, rather than copying only the executable.
+
 ## Run
 
 If you installed from a release binary, launch `harp_updater_gui.exe`.
@@ -108,6 +115,29 @@ Runtime configuration in `ui.run(...)` (see `src/harp_updater_gui/main.py`):
 4. Optionally enable **Update all devices with same name**.
 5. Click **Deploy Firmware**.
 6. Monitor progress in the activity log and dialogs.
+
+### ATxmega firmware updates
+
+Intel HEX metadata comes from the original filename, not the image contents. Use
+`<device>-fw<firmware>-harp<core>-hw<hardware>-ass<assembly>.hex`, for example
+`Behavior-fw3.3-harp1.15-hw2.0-ass0.hex`. Versions have two components; hardware
+and assembly accept `x` wildcards, and preview builds may append `-preview<number>`.
+Generic filenames such as `firmware.hex` are rejected, even with Force upload enabled.
+
+Before flashing, the GUI runs the regulator with `--no-upload` to validate metadata
+and HEX checksums without connecting to a device. This check runs again on every
+deployment, including forced uploads. Toolkit then checks the device name and hardware
+compatibility before resetting the device.
+
+ATxmega uploads always restart the device (`--no-reboot` is not supported). Regulator
+waits up to 20 seconds for a Harp response before reporting success. A readiness timeout
+means firmware was written but the device did not respond, not that flashing succeeded.
+Stage output and errors are retained in the activity log when the command returns.
+
+Force upload skips device-name and hardware checks and can recover a device already
+in bootloader mode. Use it only for an intentional compatibility override or recovery;
+it does not bypass image validation. The GUI suggests it only when Regulator identifies
+a pre-reset connection or compatibility failure, not after a write or readiness failure.
 
 ## Project Structure
 

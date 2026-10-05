@@ -135,3 +135,45 @@ def test_install_drivers_delegates_to_cli(device_manager, mocker):
     assert success is True
     assert output == "Drivers installed"
     mock_install.assert_called_once_with()
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_atxmega_upload_uses_serial_port_and_progress(device_manager, mocker, force):
+    device = Device(
+        Confidence="High", Kind="ATxmega", State="Bootloader", PortName="COM4"
+    )
+    upload = mocker.patch.object(
+        device_manager.cli, "upload_firmware", return_value=(True, "Successfully uploaded")
+    )
+
+    assert device_manager.upload_firmware_to_device(device, "firmware.hex", force)[0]
+    upload.assert_called_once_with(
+        firmware_path="firmware.hex",
+        target="COM4",
+        force=force,
+        no_interactive=True,
+        progress=True,
+        verbose=force,
+    )
+
+
+def test_atxmega_upload_requires_serial_port(device_manager, mocker):
+    device = Device(Confidence="Low", Kind="ATxmega", State="Bootloader")
+    upload = mocker.patch.object(device_manager.cli, "upload_firmware")
+
+    success, output = device_manager.upload_firmware_to_device(device, "firmware.hex")
+
+    assert not success
+    assert "serial port" in output
+    upload.assert_not_called()
+
+
+def test_pico_bootloader_upload_is_unchanged(device_manager, mocker):
+    device = Device(Confidence="High", Kind="Pico", State="Bootloader")
+    upload = mocker.patch.object(
+        device_manager.cli, "upload_firmware", return_value=(True, "Finished uploading")
+    )
+
+    assert device_manager.upload_firmware_to_device(device, "firmware.uf2")[0]
+    assert upload.call_args.kwargs["target"] == "PICOBOOT"
+    assert upload.call_args.kwargs["progress"] is False

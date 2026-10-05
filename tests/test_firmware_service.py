@@ -89,6 +89,59 @@ def test_inspect_firmware_cache(firmware_service, mocker):
     firmware_service.cli.inspect_firmware.assert_called_once()
 
 
+def test_validate_atxmega_without_device_connection(firmware_service, tmp_path, mocker):
+    firmware = tmp_path / "Behavior-fw3.3-harp1.15-hw2.0-ass0.hex"
+    firmware.write_text(":0400000001020304F2\n:00000001FF\n")
+    upload = mocker.patch.object(
+        firmware_service.cli, "upload_firmware", return_value=(True, "Firmware upload skipped")
+    )
+
+    assert firmware_service.validate_firmware_file("ATxmega", str(firmware)) == (True, "")
+    upload.assert_called_once_with(
+        firmware_path=str(firmware),
+        target="validation-only",
+        no_interactive=True,
+        progress=False,
+        no_upload=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "error",
+    ["Invalid Harp firmware metadata specification string", "Invalid HEX checksum"],
+)
+def test_validate_atxmega_rejects_regulator_errors(
+    firmware_service, tmp_path, mocker, error
+):
+    firmware = tmp_path / "firmware.hex"
+    firmware.write_text(":00000001FF\n")
+    mocker.patch.object(
+        firmware_service.cli, "upload_firmware", return_value=(False, error)
+    )
+
+    valid, message = firmware_service.validate_firmware_file("ATxmega", str(firmware))
+
+    assert not valid
+    assert error in message
+    assert "<device>-fw<firmware>" in message
+    assert "Force upload cannot bypass" in message
+
+
+def test_validate_atxmega_does_not_use_inspection_cache(firmware_service, tmp_path, mocker):
+    firmware = tmp_path / "Behavior-fw3.3-harp1.15-hw2.0-ass0.hex"
+    firmware.write_text(":00000001FF\n")
+    firmware_service.firmware_cache[str(firmware)] = {"Metadata": firmware.stem}
+    upload = mocker.patch.object(
+        firmware_service.cli, "upload_firmware", return_value=(True, "")
+    )
+
+    assert firmware_service.validate_firmware_file("ATxmega", str(firmware))[0]
+    firmware.write_text("invalid image")
+    upload.return_value = (False, "Invalid HEX checksum")
+    assert not firmware_service.validate_firmware_file("ATxmega", str(firmware))[0]
+    assert upload.call_count == 2
+
+
 def test_fetch_available_firmware(firmware_service):
     """Test fetching available firmware for a device"""
     device_id = "EnvironmentSensor"

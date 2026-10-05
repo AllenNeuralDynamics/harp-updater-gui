@@ -126,7 +126,7 @@ class FirmwareService:
         """
         path = Path(firmware_path)
 
-        if not path.exists():
+        if not path.is_file():
             return False, "Firmware file does not exist"
 
         ext = self.get_firmware_type(firmware_path)
@@ -143,7 +143,22 @@ class FirmwareService:
         if device_kind == "ATxmega" and ext != ".hex":
             return False, "ATxmega devices require .hex firmware files"
 
-        # Could add more validation here (e.g., file size, magic bytes)
+        if device_kind == "ATxmega":
+            valid, output = self.cli.upload_firmware(
+                firmware_path=firmware_path,
+                target="validation-only",
+                no_interactive=True,
+                progress=False,
+                no_upload=True,
+            )
+            if not valid:
+                return False, (
+                    f"ATxmega firmware validation failed: {output}\n"
+                    "Expected filename: <device>-fw<firmware>-harp<core>"
+                    "-hw<hardware>-ass<assembly>.hex. "
+                    "Force upload cannot bypass invalid metadata or HEX checksums."
+                )
+
         return True, ""
 
     def fetch_available_firmware(self, device_id: str) -> List[str]:

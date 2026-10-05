@@ -105,6 +105,10 @@ class HarpFirmwareUpdaterApp:
         if isinstance(devices, Device):
             devices = [devices]
 
+        if not devices:
+            ui.notify("No devices selected", type="warning")
+            return
+
         total_devices = len(devices)
         is_batch = total_devices > 1
 
@@ -150,9 +154,14 @@ class HarpFirmwareUpdaterApp:
             )
 
             # Validate using firmware service
-            valid, error_msg = self.firmware_service.validate_firmware_file(
-                devices[0].kind, firmware_path
-            )
+            if len({device.kind for device in devices}) > 1:
+                valid, error_msg = False, "Batch updates require devices of the same kind"
+            else:
+                valid, error_msg = await run.io_bound(
+                    self.firmware_service.validate_firmware_file,
+                    devices[0].kind,
+                    firmware_path,
+                )
             if not valid:
                 self.update_workflow.push_log(
                     f"Invalid firmware file: {error_msg}", LogLevel.ERROR
@@ -202,8 +211,13 @@ class HarpFirmwareUpdaterApp:
                         LogLevel.INFO,
                     )
 
+                if device.kind == "ATxmega":
+                    upload_label.set_text(
+                        f"Updating {device.port_name}: upload and restart check..."
+                    )
+
                 # Upload firmware using device manager (run in thread to avoid blocking UI)
-                success, output = await run.cpu_bound(
+                success, output = await run.io_bound(
                     self.device_manager.upload_firmware_to_device,
                     device,
                     firmware_path,
@@ -211,6 +225,9 @@ class HarpFirmwareUpdaterApp:
                 )
 
                 if success:
+                    for line in output.splitlines():
+                        if line.strip():
+                            self.update_workflow.push_log(line.strip(), LogLevel.DEBUG)
                     success_count += 1
                     successful_updates.append(
                         {
@@ -239,13 +256,14 @@ class HarpFirmwareUpdaterApp:
 
                     # For single device, show error dialog
                     if not is_batch:
-                        if not force:
-                            error_msg = f"Firmware upload failed: {output}"
+                        error_msg = f"Firmware upload failed: {output}"
+                        if not force and (
+                            device.kind != "ATxmega"
+                            or "Upload aborted. Use --force" in output
+                        ):
                             self.update_workflow.show_error_with_force(error_msg)
                         else:
-                            self.update_workflow.show_error(
-                                f"Forced firmware upload failed: {output}"
-                            )
+                            self.update_workflow.show_error(error_msg)
                         ui.notify("Firmware upload failed", type="negative")
                         return
 
@@ -273,17 +291,16 @@ class HarpFirmwareUpdaterApp:
                         type="positive",
                     )
             else:
-                self.update_workflow.push_log(
-                    "Verifying firmware installation...", LogLevel.INFO
-                )
-
-                # Give device time to reboot and reconnect (3 seconds)
-                self.update_workflow.push_log(
-                    "Waiting for device to reboot...", LogLevel.INFO
-                )
-                await run.io_bound(lambda: __import__("time").sleep(3))
-
-                self.update_workflow.push_log("Firmware verified", LogLevel.SUCCESS)
+                if devices[0].kind == "ATxmega":
+                    self.update_workflow.push_log(
+                        "Device responded after restart (confirmed by HarpRegulator).",
+                        LogLevel.SUCCESS,
+                    )
+                else:
+                    self.update_workflow.push_log(
+                        "Waiting for device to reboot...", LogLevel.INFO
+                    )
+                    await run.io_bound(lambda: __import__("time").sleep(3))
                 self.update_workflow.complete_update(True)
 
             # Close loading dialog
