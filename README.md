@@ -116,6 +116,27 @@ Runtime configuration in `ui.run(...)` (see `src/harp_updater_gui/main.py`):
 5. Click **Deploy Firmware**.
 6. Monitor progress in the activity log and dialogs.
 
+### Device operation safety
+
+Only one app instance can run per user. Refresh, driver installation, and firmware
+deployment share a device-operation lock across browser clients and app processes.
+Deployment holds the lock through the entire batch and final refresh. If a UI task
+is cancelled, an active device command retains the lock until it finishes.
+
+Selection is reconciled against each refreshed snapshot using USB instance identity
+or serial number when available. Removed, conflicting, or ambiguous devices lose
+selection. Each upload rediscovers its target without connecting, so a device that
+moves to another COM port uses its current port rather than a stale one. Force does
+not bypass these identity and ambiguity checks.
+
+A Pico already in bootloader mode still uses the regulator's `PICOBOOT` target,
+but only when it is the uniquely identified selected device and exactly one Pico
+bootloader is present. Deployment to other devices is blocked while a bootloader
+is present. For devices without USB identity or serial metadata, port-only checks
+cannot prove physical identity after replacement; refresh and reselect after
+reconnecting, and connect only the intended Pico for bootloader recovery. These
+locks do not prevent unrelated applications from accessing devices.
+
 ### ATxmega firmware updates
 
 Intel HEX metadata comes from the original filename, not the image contents. Use

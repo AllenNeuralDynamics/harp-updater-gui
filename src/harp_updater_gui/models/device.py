@@ -70,6 +70,17 @@ class Device(BaseModel):
         return self
 
     @property
+    def identity(self) -> str:
+        """Best available identity, independent of display name and current COM port."""
+        if self.source and " - " in self.source:
+            return f"source:{self.source.rsplit(' - ', 1)[1].casefold()}"
+        if self.serial_number:
+            return f"serial:{self.serial_number.casefold()}"
+        if self.port_name:
+            return f"{self.kind}:port:{self.port_name.casefold()}"
+        return f"{self.kind}:unidentified"
+
+    @property
     def display_name(self) -> str:
         """Get a human-readable display name for the device"""
         if self.device_description:

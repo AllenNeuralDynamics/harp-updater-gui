@@ -5,6 +5,7 @@ import platform
 from harp_updater_gui.models.device import Device
 from harp_updater_gui.services.device_manager import DeviceManager
 from harp_updater_gui.services.firmware_service import FirmwareService
+from harp_updater_gui.services.device_operations import DeviceOperationBusy, DeviceOperationLease
 
 
 class DeviceTable:
@@ -35,6 +36,8 @@ class DeviceTable:
         self.batch_update_checkbox = None
         self.file_path_label = None
         self.deploy_button = None
+        self.browse_button = None
+        self.is_deploying = False
         self.connect_all_on_refresh_checkbox = None
         self.connect_all_on_refresh = False
         self.refresh_button = None
@@ -64,6 +67,11 @@ class DeviceTable:
         if not devices:
             return False, "No devices available for firmware deployment"
 
+        if not self.selected_device or self.device_manager.get_device_by_identity(
+            self.selected_device.identity, expected=self.selected_device
+        ) is None:
+            return False, "Select a uniquely identifiable device from the current device list"
+
         bootloader_devices = [d for d in devices if d.state == "Bootloader"]
         error_devices = [
             d for d in devices if d.state in ("DriverError", "DeviceError")
@@ -82,7 +90,7 @@ class DeviceTable:
                 return False, "Select the Bootloader device to deploy firmware"
 
             bootloader_device = bootloader_devices[0]
-            if self.selected_device.port_name != bootloader_device.port_name:
+            if self.selected_device.identity != bootloader_device.identity:
                 return False, "Deployment allowed only to the single Bootloader device"
 
             if self.batch_update_checkbox and self.batch_update_checkbox.value:
@@ -98,6 +106,27 @@ class DeviceTable:
             return False, "Deployment blocked: multiple devices are in Bootloader state"
 
         return True, None
+
+    def _operations_busy(self) -> bool:
+        return (
+            self.is_deploying or self.is_refreshing or self.is_installing_drivers
+            or self.device_manager.operations.is_busy
+        )
+
+    def _update_control_state(self):
+        busy = self._operations_busy()
+        for control in (
+            self.refresh_button, self.install_drivers_button, self.browse_button,
+            self.connect_all_on_refresh_checkbox, self.force_upload_checkbox,
+            self.batch_update_checkbox,
+        ):
+            if control is not None:
+                control.set_enabled(not busy)
+        if self.table is not None:
+            self.table.props(f"selection={'none' if busy else 'single'}")
+        if self.deploy_button is not None:
+            eligible, _ = self._get_deploy_eligibility()
+            self.deploy_button.set_enabled(bool(not busy and self.firmware_file_path and eligible))
 
     def render(self):
         """Render the device table panel"""
@@ -193,7 +222,7 @@ class DeviceTable:
                         },
                     ],
                     rows=[],
-                    row_key="port",
+                    row_key="id",
                     selection="single",
                     pagination={
                         "rowsPerPage": 10,
@@ -228,7 +257,7 @@ class DeviceTable:
                     with ui.column().classes("firmware-upload-file-area"):
                         ui.label("Select Firmware File").classes("text-sm font-medium")
                         with ui.row().classes("items-center gap-3 firmware-upload-file-row"):
-                            ui.button(
+                            self.browse_button = ui.button(
                                 "📁 Browse", on_click=self.browse_firmware
                             ).classes("btn btn-secondary")
                             self.file_path_label = ui.label("No file selected").classes(
@@ -242,6 +271,7 @@ class DeviceTable:
                         self.batch_update_checkbox.tooltip(
                             "When enabled, all devices with the same name as the selected device will be updated"
                         )
+                        self.batch_update_checkbox.on_value_change(self._update_control_state)
                         self.force_upload_checkbox = ui.checkbox(
                             "Force upload (bypass safety checks)"
                         )
@@ -253,6 +283,7 @@ class DeviceTable:
 
             # Initial load
             ui.timer(0.1, self._initial_refresh, once=True)
+            ui.timer(0.5, self._update_control_state)
 
     def _has_driver_error_devices(self) -> bool:
         """Return True when at least one connected device is in DriverError state."""
@@ -284,10 +315,24 @@ class DeviceTable:
 
     async def install_drivers(self):
         """Install required device drivers and refresh the device list."""
-        if self.is_installing_drivers:
+        if self._operations_busy():
+            ui.notify("Another device operation is in progress", type="warning")
+            return
+        try:
+            operation = self.device_manager.operations.begin("Driver installation")
+        except DeviceOperationBusy as error:
+            ui.notify(str(error), type="warning")
             return
 
+        try:
+            await self._install_drivers(operation)
+        finally:
+            self.device_manager.operations.end(operation)
+            self._update_control_state()
+
+    async def _install_drivers(self, operation: DeviceOperationLease):
         self.is_installing_drivers = True
+        self._update_control_state()
         self._log_activity("Starting driver installation via HarpRegulator", "info")
         if self.install_drivers_button:
             self.install_drivers_button.set_enabled(False)
@@ -300,7 +345,9 @@ class DeviceTable:
         install_dialog.open()
 
         try:
-            success, output = await run.cpu_bound(self.device_manager.install_drivers)
+            success, output = await run.io_bound(
+                self.device_manager.install_drivers, operation=operation
+            )
 
             if success:
                 ui.notify("Driver installation completed", type="positive")
@@ -314,15 +361,14 @@ class DeviceTable:
                     f"Driver installation failed: {error_text}", "error"
                 )
 
-            await self.refresh_devices(show_notification=False)
+            await self.refresh_devices(show_notification=False, operation=operation)
         except Exception as e:
             ui.notify(f"Driver installation error: {str(e)}", type="negative")
             self._log_activity(f"Driver installation error: {str(e)}", "error")
         finally:
             install_dialog.close()
             self.is_installing_drivers = False
-            if self.install_drivers_button:
-                self.install_drivers_button.set_enabled(True)
+            self._update_control_state()
 
     async def _initial_refresh(self):
         """Run initial refresh after UI has mounted."""
@@ -332,8 +378,7 @@ class DeviceTable:
         """Update refresh UI state."""
         self.is_refreshing = refreshing
 
-        if self.refresh_button:
-            self.refresh_button.set_enabled(not refreshing)
+        self._update_control_state()
 
         if self.refresh_dialog:
             if refreshing:
@@ -341,10 +386,25 @@ class DeviceTable:
             else:
                 self.refresh_dialog.close()
 
-    async def refresh_devices(self, show_notification: bool = True):
+    async def refresh_devices(
+        self, show_notification: bool = True, *, operation: DeviceOperationLease | None = None
+    ):
         """Refresh device list from device manager"""
         if self.is_refreshing:
             return
+
+        owns_operation = operation is None
+        if owns_operation:
+            if self._operations_busy():
+                if show_notification:
+                    ui.notify("Another device operation is in progress", type="warning")
+                return
+            try:
+                operation = self.device_manager.operations.begin("Device discovery")
+            except DeviceOperationBusy as error:
+                if show_notification:
+                    ui.notify(str(error), type="warning")
+                return
 
         self._set_refreshing(True)
 
@@ -355,6 +415,7 @@ class DeviceTable:
                 self.device_manager.refresh_devices,
                 True,
                 self.connect_all_on_refresh,
+                operation=operation,
             )
             self.update_table()
             if show_notification:
@@ -362,6 +423,8 @@ class DeviceTable:
         except Exception as e:
             ui.notify(f"Error: {str(e)}", type="negative")
         finally:
+            if owns_operation:
+                self.device_manager.operations.end(operation)
             self._set_refreshing(False)
 
     async def on_connect_all_refresh_toggle(self, e):
@@ -377,6 +440,11 @@ class DeviceTable:
 
     def update_table(self):
         """Update the device table with filtered data"""
+        if self.selected_device:
+            self.selected_device = self.device_manager.get_device_by_identity(
+                self.selected_device.identity, expected=self.selected_device
+            )
+        self.device_manager.select_device(self.selected_device)
         # Only filter by device type since search is handled by table's built-in filter
         devices = self.device_manager.filter_devices(
             search_query=None,  # Don't filter by search query - the table handles this
@@ -384,7 +452,7 @@ class DeviceTable:
         )
 
         rows = []
-        for device in devices:
+        for index, device in enumerate(devices):
             # Map health color to Quasar color
             status_color = (
                 "positive"
@@ -394,6 +462,8 @@ class DeviceTable:
 
             rows.append(
                 {
+                    "id": f"{device.identity}:{index}",
+                    "identity": device.identity,
                     "name": device.display_name,
                     "port": device.port_name,
                     "kind": "PICO"
@@ -407,35 +477,38 @@ class DeviceTable:
             )
 
         self.table.rows = rows
+        self.table.selected = [
+            row for row in rows
+            if self.selected_device and row["identity"] == self.selected_device.identity
+        ]
         self.table.update()
         self._render_driver_install_action()
-
-        # Enable deploy button if firmware is selected
-        if self.firmware_file_path and self.selected_device:
-            self.deploy_button.set_enabled(True)
+        self._update_control_state()
 
     def on_row_select(self, e):
         """Handle row selection"""
+        if self._operations_busy():
+            self.table.selected = [
+                row for row in self.table.rows
+                if self.selected_device and row["identity"] == self.selected_device.identity
+            ]
+            self.table.update()
+            return
         # Access the table's selected rows directly
         if self.table.selected and len(self.table.selected) > 0:
             selected_row = self.table.selected[0]
-            port_name = selected_row["port"]
-
-            # Find the device by port name
-            devices = self.device_manager.get_devices()
-            self.selected_device = next(
-                (d for d in devices if d.port_name == port_name), None
+            self.selected_device = self.device_manager.get_device_by_identity(
+                selected_row["identity"]
             )
-
-            # Enable deploy button if firmware is selected
-            if self.firmware_file_path and self.selected_device:
-                self.deploy_button.set_enabled(True)
         else:
             self.selected_device = None
-            self.deploy_button.set_enabled(False)
+        self.device_manager.select_device(self.selected_device)
+        self._update_control_state()
 
     async def browse_firmware(self):
         """Open file picker to browse for firmware file"""
+        if self._operations_busy():
+            return
         # Prefer native dialog when available (native mode)
         if app.native.main_window:
             try:
@@ -453,8 +526,7 @@ class DeviceTable:
                     selected_path = paths[0]
                     self.firmware_file_path = selected_path
                     self.file_path_label.set_text(Path(selected_path).name)
-                    if self.selected_device:
-                        self.deploy_button.set_enabled(True)
+                    self._update_control_state()
                     ui.notify(f"Selected: {Path(selected_path).name}", type="info")
                 return
 
@@ -488,12 +560,14 @@ class DeviceTable:
         if result:
             self.firmware_file_path = result
             self.file_path_label.set_text(result)
-            if self.selected_device:
-                self.deploy_button.set_enabled(True)
+            self._update_control_state()
             ui.notify(f"Selected: {result}", type="info")
 
     async def deploy_firmware(self):
         """Deploy firmware to selected device(s)"""
+        if self._operations_busy():
+            ui.notify("Another device operation is in progress", type="warning")
+            return
         if not self.selected_device:
             ui.notify("Please select a device first", type="warning")
             return
@@ -508,7 +582,8 @@ class DeviceTable:
             return
 
         # Disable button during deployment
-        self.deploy_button.set_enabled(False)
+        self.is_deploying = True
+        self._update_control_state()
 
         try:
             if self.on_deploy:
@@ -540,9 +615,9 @@ class DeviceTable:
                         [self.selected_device], self.firmware_file_path, force
                     )
         finally:
-            # Re-enable button after deployment
-            if self.selected_device and self.firmware_file_path:
-                self.deploy_button.set_enabled(True)
+            self.is_deploying = False
+            if self.force_upload_checkbox:
                 self.force_upload_checkbox.set_value(
                     False
                 )  # Reset force upload checkbox after operation
+            self._update_control_state()

@@ -1,12 +1,20 @@
 from typing import List, Optional
 from harp_updater_gui.services.cli_wrapper import CLIWrapper
+from harp_updater_gui.services.device_operations import (
+    DEVICE_OPERATIONS,
+    DeviceOperationBusy,
+    DeviceOperationLease,
+    DeviceOperations,
+)
 from harp_updater_gui.models.device import Device
 
 
 class DeviceManager:
     """Manager for Harp device operations"""
 
-    def __init__(self, cli_path: str = "HarpRegulator"):
+    def __init__(
+        self, cli_path: str = "HarpRegulator", operations: DeviceOperations | None = None
+    ):
         """
         Initialize device manager
 
@@ -14,11 +22,16 @@ class DeviceManager:
             cli_path: Path to HarpRegulator executable
         """
         self.cli = CLIWrapper(cli_path)
+        self.operations = operations or DEVICE_OPERATIONS
         self.devices: List[Device] = []
         self.selected_device: Optional[Device] = None
 
     def refresh_devices(
-        self, all_devices: bool = True, allow_connect: bool = True
+        self,
+        all_devices: bool = True,
+        allow_connect: bool = True,
+        *,
+        operation: DeviceOperationLease | None = None,
     ) -> List[Device]:
         """
         Refresh the list of connected devices
@@ -30,27 +43,51 @@ class DeviceManager:
         Returns:
             List of Device objects
         """
+        with self.operations.operation("Device discovery", operation):
+            return self._refresh_devices(all_devices, allow_connect)
+
+    def _refresh_devices(self, all_devices: bool, allow_connect: bool) -> List[Device]:
         device_data = self.cli.list_devices(
             all_devices=all_devices, allow_connect=allow_connect
         )
 
-        self.devices = []
+        devices = []
         for data in device_data:
             try:
                 device = Device(**data)
-                self.devices.append(device)
+                devices.append(device)
             except Exception as e:
                 print(f"Error parsing device data: {e}")
                 print(f"Raw data: {data}")
                 continue
 
+        self.devices = devices
+        if self.selected_device:
+            self.selected_device = self.get_device_by_identity(
+                self.selected_device.identity, expected=self.selected_device
+            )
         return self.devices
 
     def get_devices(self) -> List[Device]:
         """Get the current list of devices"""
         return self.devices
 
-    def select_device(self, device: Device):
+    def get_device_by_identity(
+        self, identity: str, *, expected: Optional[Device] = None
+    ) -> Optional[Device]:
+        """Resolve an identity only when it has exactly one current match."""
+        matches = [device for device in self.devices if device.identity == identity]
+        if len(matches) != 1:
+            return None
+        current = matches[0]
+        if (
+            expected and expected.serial_number and current.serial_number
+            and expected.serial_number.casefold() != current.serial_number.casefold()
+        ):
+            return None
+        return current
+
+    def select_device(self, device: Optional[Device]):
         """Select a device for operations"""
         self.selected_device = device
 
@@ -114,7 +151,12 @@ class DeviceManager:
         return filtered
 
     def upload_firmware_to_device(
-        self, device: Device, firmware_path: str, force: bool = False
+        self,
+        device: Device,
+        firmware_path: str,
+        force: bool = False,
+        *,
+        operation: DeviceOperationLease | None = None,
     ) -> tuple[bool, str]:
         """
         Upload firmware to a specific device
@@ -127,26 +169,59 @@ class DeviceManager:
         Returns:
             Tuple of (success, message)
         """
-        target = device.port_name
-
-        if device.kind == "ATxmega" and not target:
+        if device.kind == "ATxmega" and not device.port_name:
             return False, "ATxmega firmware uploads require a serial port."
 
-        # Use PICOBOOT if device is in bootloader state and is Pico
-        if device.state == "Bootloader" and device.kind == "Pico":
-            target = "PICOBOOT"
+        try:
+            with self.operations.operation("Firmware upload", operation):
+                devices = self._refresh_devices(all_devices=True, allow_connect=False)
+                current = self.get_device_by_identity(device.identity, expected=device)
+                if current is None:
+                    return False, (
+                        "The selected device is no longer uniquely identifiable. "
+                        "Refresh and select the device again."
+                    )
+                if current.kind not in (device.kind, "FTDI", "Unknown"):
+                    return False, "The selected device kind changed. Refresh and select it again."
+                if any(item.state in ("DriverError", "DeviceError") for item in devices):
+                    return False, "Deployment blocked: a discovered device is in an error state."
+                if current.state not in ("Online", "Unknown", "Bootloader"):
+                    return False, "The selected device is not available for deployment."
 
-        success, output = self.cli.upload_firmware(
-            firmware_path=firmware_path,
-            target=target,
-            force=force,
-            no_interactive=True,
-            progress=device.kind == "ATxmega",
-            verbose=force,
-        )
+                target = current.port_name
+                if current.state == "Bootloader" and current.kind == "Pico":
+                    pico_bootloaders = [
+                        item for item in devices
+                        if item.kind == "Pico" and item.state == "Bootloader"
+                    ]
+                    if len(pico_bootloaders) != 1:
+                        return False, "PICOBOOT requires exactly one connected Pico bootloader."
+                    target = "PICOBOOT"
+                bootloaders = [item for item in devices if item.state == "Bootloader"]
+                if len(bootloaders) > 1:
+                    return False, "Deployment blocked: multiple devices are in bootloader mode."
+                if bootloaders and bootloaders[0].identity != current.identity:
+                    return False, "Deployment allowed only to the single bootloader device."
+                if not target:
+                    return False, "The selected device has no usable upload target."
 
-        return success, output
+                return self.cli.upload_firmware(
+                    firmware_path=firmware_path,
+                    target=target,
+                    force=force,
+                    no_interactive=True,
+                    progress=device.kind == "ATxmega",
+                    verbose=force,
+                )
+        except DeviceOperationBusy as error:
+            return False, str(error)
 
-    def install_drivers(self) -> tuple[bool, str]:
+    def install_drivers(
+        self, *, operation: DeviceOperationLease | None = None
+    ) -> tuple[bool, str]:
         """Install drivers using HarpRegulator."""
-        return self.cli.install_drivers()
+        try:
+            with self.operations.operation("Driver installation", operation):
+                return self.cli.install_drivers()
+        except DeviceOperationBusy as error:
+            return False, str(error)

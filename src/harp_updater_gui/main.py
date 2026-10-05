@@ -18,6 +18,11 @@ from harp_updater_gui.components.device_table import DeviceTable
 from harp_updater_gui.components.update_workflow import UpdateWorkflow, LogLevel
 from harp_updater_gui.services.device_manager import DeviceManager
 from harp_updater_gui.services.firmware_service import FirmwareService
+from harp_updater_gui.services.device_operations import (
+    DeviceOperationBusy,
+    DeviceOperationLease,
+    single_app_instance,
+)
 from harp_updater_gui.utils.update_audit_logger import (
     log_successful_firmware_update,
     setup_update_audit_logger,
@@ -109,6 +114,25 @@ class HarpFirmwareUpdaterApp:
             ui.notify("No devices selected", type="warning")
             return
 
+        devices = [device.model_copy(deep=True) for device in devices]
+        try:
+            operation = self.device_manager.operations.begin("Firmware deployment")
+        except DeviceOperationBusy as error:
+            ui.notify(str(error), type="warning")
+            return
+        try:
+            await self._deploy_with_operation(devices, firmware_path, force, operation)
+        finally:
+            self.device_manager.operations.end(operation)
+            self.device_table._update_control_state()
+
+    async def _deploy_with_operation(
+        self,
+        devices: List[Device],
+        firmware_path: str,
+        force: bool,
+        operation: DeviceOperationLease,
+    ):
         total_devices = len(devices)
         is_batch = total_devices > 1
 
@@ -176,8 +200,8 @@ class HarpFirmwareUpdaterApp:
             self.update_workflow.push_log(
                 "Closing device connections...", LogLevel.INFO
             )
-            await run.cpu_bound(
-                self.device_manager.refresh_devices, allow_connect=False
+            await run.io_bound(
+                self.device_manager.refresh_devices, allow_connect=False, operation=operation
             )
 
             # Wait for OS to release port handles
@@ -222,6 +246,7 @@ class HarpFirmwareUpdaterApp:
                     device,
                     firmware_path,
                     force,
+                    operation=operation,
                 )
 
                 if success:
@@ -265,6 +290,7 @@ class HarpFirmwareUpdaterApp:
                         else:
                             self.update_workflow.show_error(error_msg)
                         ui.notify("Firmware upload failed", type="negative")
+                        await self.device_table.refresh_devices(False, operation=operation)
                         return
 
             # Step 3: Verify and complete
@@ -307,7 +333,7 @@ class HarpFirmwareUpdaterApp:
             loading_dialog.close()
 
             # Refresh device table to get updated info
-            await self.device_table.refresh_devices(False)
+            await self.device_table.refresh_devices(False, operation=operation)
 
             refreshed_devices = {
                 d.port_name: (d.firmware_version or "unknown")
@@ -437,18 +463,19 @@ def start_app():
 
     # Run the application
     try:
-        ui.run(
-            root=root,
-            title="Harp Updater GUI",
-            favicon="🔧",
-            host="0.0.0.0",
-            port=4277,
-            dark=None,  # Start in auto mode (respects system preference)
-            reload=False,
-            show=True,
-            native=True,
-            window_size=(1350, 1000),
-        )
+        with single_app_instance():
+            ui.run(
+                root=root,
+                title="Harp Updater GUI",
+                favicon="🔧",
+                host="0.0.0.0",
+                port=4277,
+                dark=None,  # Start in auto mode (respects system preference)
+                reload=False,
+                show=True,
+                native=True,
+                window_size=(1350, 1000),
+            )
     except KeyboardInterrupt:
         # Clean shutdown on Ctrl+C
         pass
