@@ -9,9 +9,9 @@
     ".NETCoreApp,Version=v8.0/win-x64": {
       "HarpRegulator/1.1.0": {
         "dependencies": {
-          "Bonsai.Harp": "3.6.1",
           "Harp.Devices": "1.0.0",
           "Harp.Protocol": "1.0.0",
+          "Harp.Toolkit.Core": "0.4.0",
           "PicobootConnection": "1.0.0",
           "System.IO.Ports": "9.0.6"
         },
@@ -52,6 +52,18 @@
           "lib/netstandard2.0/Bonsai.System.dll": {
             "assemblyVersion": "2.8.0.0",
             "fileVersion": "2.8.0.4248"
+          }
+        }
+      },
+      "Harp.Toolkit.Core/0.4.0": {
+        "dependencies": {
+          "Bonsai.Harp": "3.6.1",
+          "System.IO.Ports": "9.0.6"
+        },
+        "runtime": {
+          "lib/net8.0/Harp.Toolkit.Core.dll": {
+            "assemblyVersion": "0.4.0.0",
+            "fileVersion": "0.4.0.0"
           }
         }
       },
@@ -178,6 +190,13 @@
       "sha512": "sha512-U+o1jH5eY5MdkxPk68umQpf1Jjroy71w86ZEktdFj/FwJJSJpa+b2cNzjv01IHAE4aYUzqIgNJyvWDlSBadx/Q==",
       "path": "bonsai.system/2.8.0",
       "hashPath": "bonsai.system.2.8.0.nupkg.sha512"
+    },
+    "Harp.Toolkit.Core/0.4.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-OeN3uNcZuOA3TviGsO6rHxX3+1PhoUdy39MHUa5xULlJ8Hh+dHylBpo2d24xf210/2GJKGjWNPXWXfegu7qGKA==",
+      "path": "harp.toolkit.core/0.4.0",
+      "hashPath": "harp.toolkit.core.0.4.0.nupkg.sha512"
     },
     "runtime.android-arm.runtime.native.System.IO.Ports/9.0.6": {
       "type": "package",
