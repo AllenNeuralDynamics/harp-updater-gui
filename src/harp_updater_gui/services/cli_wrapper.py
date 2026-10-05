@@ -1,7 +1,8 @@
+import codecs
 import json
 import os
 import subprocess
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 
 
 class CLIWrapper:
@@ -36,6 +37,40 @@ class CLIWrapper:
             check=True,
             **self._subprocess_kwargs,
         )
+
+    def _run_streaming_command(
+        self, cmd: List[str], on_output: Callable[[str], None]
+    ) -> subprocess.CompletedProcess[str]:
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        output = []
+        pending = ""
+        with subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            **self._subprocess_kwargs,
+        ) as process:
+            assert process.stdout is not None
+            while chunk := process.stdout.read1(4096):
+                text = decoder.decode(chunk)
+                output.append(text)
+                pending += text
+                lines = pending.splitlines(keepends=True)
+                pending = ""
+                for line in lines:
+                    if line.endswith(("\r", "\n")):
+                        if line.strip():
+                            on_output(line.strip())
+                    else:
+                        pending += line
+            remainder = decoder.decode(b"", final=True)
+            output.append(remainder)
+            pending += remainder
+            if pending.strip():
+                on_output(pending.strip())
+            result = subprocess.CompletedProcess(cmd, process.wait(), stdout="".join(output))
+        result.check_returncode()
+        return result
 
     def _run_elevated_windows(self, args: List[str]) -> tuple[bool, str]:
         """Run a command elevated via UAC on Windows and wait for completion."""
@@ -154,6 +189,7 @@ class CLIWrapper:
         no_reboot: bool = False,
         verbose: bool = False,
         no_upload: bool = False,
+        on_output: Optional[Callable[[str], None]] = None,
     ) -> tuple[bool, str]:
         """
         Upload firmware to a Harp device
@@ -167,6 +203,7 @@ class CLIWrapper:
             no_reboot: Don't reboot after upload
             verbose: Show verbose output
             no_upload: Validate ATxmega firmware without connecting to a device
+            on_output: Receive each output line or carriage-return progress update as it arrives
         Returns:
             Tuple of (success: bool, output: str)
         """
@@ -193,7 +230,10 @@ class CLIWrapper:
             cmd.append("--no-upload")
 
         try:
-            result = self._run_command(cmd)
+            result = (
+                self._run_streaming_command(cmd, on_output)
+                if on_output is not None else self._run_command(cmd)
+            )
             return True, result.stdout
 
         except subprocess.CalledProcessError as e:

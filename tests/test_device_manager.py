@@ -201,7 +201,24 @@ def test_atxmega_upload_uses_serial_port_and_progress(device_manager, mocker, fo
         no_interactive=True,
         progress=True,
         verbose=force,
+        on_output=None,
     )
+
+
+def test_upload_forwards_live_output_callback(device_manager, mocker):
+    device = Device(Confidence="High", Kind="ATxmega", State="Online", PortName="COM4")
+    callback = mocker.Mock()
+    mocker.patch.object(
+        device_manager.cli, "list_devices", return_value=[device.model_dump(by_alias=True)]
+    )
+    upload = mocker.patch.object(
+        device_manager.cli, "upload_firmware", return_value=(True, "Uploaded")
+    )
+
+    assert device_manager.upload_firmware_to_device(
+        device, "firmware.hex", on_output=callback
+    )[0]
+    assert upload.call_args.kwargs["on_output"] is callback
 
 
 def test_atxmega_upload_requires_serial_port(device_manager, mocker):

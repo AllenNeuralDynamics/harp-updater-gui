@@ -1,5 +1,5 @@
 import asyncio
-from threading import Event
+from threading import Event, get_ident
 
 import pytest
 
@@ -115,7 +115,7 @@ async def test_mixed_device_kinds_are_rejected_before_batch_upload(updater):
 async def test_deployment_lease_covers_batch_and_final_refresh(updater):
     leases = []
 
-    def upload(*args, operation):
+    def upload(*args, operation, on_output=None):
         assert updater.device_manager.operations.is_busy
         leases.append(operation)
         return True, "Uploaded"
@@ -198,7 +198,7 @@ async def test_cancelled_upload_keeps_guard_until_worker_exits(updater, mocker):
     release = Event()
     operations = updater.device_manager.operations
 
-    def upload(*args, operation):
+    def upload(*args, operation, on_output=None):
         try:
             with operations.operation("Firmware upload", operation):
                 loop.call_soon_threadsafe(entered.set)
@@ -231,3 +231,52 @@ async def test_cancelled_upload_keeps_guard_until_worker_exits(updater, mocker):
             await task
 
     assert not operations.is_busy
+    main.ui.timer.return_value.deactivate.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("success", [True, False])
+async def test_atxmega_logs_progress_before_upload_finishes(updater, mocker, success):
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = Event()
+    ui_threads = []
+    updater.update_workflow.push_log.side_effect = lambda *args: ui_threads.append(get_ident())
+
+    def upload(*args, operation, on_output):
+        with updater.device_manager.operations.operation("Firmware upload", operation):
+            on_output("10% Write")
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(timeout=5)
+            on_output("Firmware written")
+            return success, "10% Write\rFirmware written\n"
+
+    async def run_callback(callback, *args, **kwargs):
+        if callback is updater.device_manager.upload_firmware_to_device:
+            return await asyncio.to_thread(callback, *args, **kwargs)
+        if getattr(callback, "__name__", "") != "<lambda>":
+            return callback(*args, **kwargs)
+
+    updater.device_manager.upload_firmware_to_device.side_effect = upload
+    mocker.patch.object(main.run, "io_bound", side_effect=run_callback)
+    task = asyncio.create_task(updater.on_firmware_deploy([atxmega_device()], "firmware.hex"))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        messages = [call.args[0] for call in updater.update_workflow.push_log.call_args_list]
+        assert "10% Write" not in messages
+        main.ui.timer.assert_called_once()
+        main.ui.timer.call_args.args[1]()
+        messages = [call.args[0] for call in updater.update_workflow.push_log.call_args_list]
+        assert "10% Write" in messages
+        assert not task.done()
+    finally:
+        release.set()
+        await asyncio.wait_for(task, timeout=5)
+
+    messages = [call.args[0] for call in updater.update_workflow.push_log.call_args_list]
+    assert messages.count("10% Write") == 1
+    assert messages.count("Firmware written") == 1
+    assert all(thread == get_ident() for thread in ui_threads)
+    main.ui.timer.return_value.deactivate.assert_called_once()
+    if not success:
+        assert "10% Write\rFirmware written" in updater.update_workflow.show_error.call_args.args[0]

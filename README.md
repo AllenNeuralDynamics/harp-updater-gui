@@ -153,7 +153,8 @@ compatibility before resetting the device.
 ATxmega uploads always restart the device (`--no-reboot` is not supported). Regulator
 waits up to 20 seconds for a Harp response before reporting success. A readiness timeout
 means firmware was written but the device did not respond, not that flashing succeeded.
-Stage output and errors are retained in the activity log when the command returns.
+Stage output and progress updates appear in the activity log while the command runs.
+Complete output is also retained for error reporting when the command returns.
 
 Force upload skips device-name and hardware checks and can recover a device already
 in bootloader mode. Use it only for an intentional compatibility override or recovery;

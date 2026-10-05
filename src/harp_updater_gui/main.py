@@ -11,6 +11,7 @@ import sys
 import logging
 import shutil
 from pathlib import Path
+from queue import Empty, SimpleQueue
 from nicegui import ui, app, run
 from nicegui import core as nicegui_core
 from harp_updater_gui.components.header import Header
@@ -240,19 +241,42 @@ class HarpFirmwareUpdaterApp:
                         f"Updating {device.port_name}: upload and restart check..."
                     )
 
-                # Upload firmware using device manager (run in thread to avoid blocking UI)
-                success, output = await run.io_bound(
-                    self.device_manager.upload_firmware_to_device,
-                    device,
-                    firmware_path,
-                    force,
-                    operation=operation,
+                pending_output: SimpleQueue[str] = SimpleQueue()
+                streamed_output = False
+
+                def flush_output():
+                    nonlocal streamed_output
+                    while True:
+                        try:
+                            line = pending_output.get_nowait()
+                        except Empty:
+                            return
+                        if line.strip():
+                            streamed_output = True
+                            self.update_workflow.push_log(line.strip(), LogLevel.DEBUG)
+
+                progress_timer = (
+                    ui.timer(0.05, flush_output) if device.kind == "ATxmega" else None
                 )
+                try:
+                    success, output = await run.io_bound(
+                        self.device_manager.upload_firmware_to_device,
+                        device,
+                        firmware_path,
+                        force,
+                        operation=operation,
+                        on_output=pending_output.put if progress_timer is not None else None,
+                    )
+                finally:
+                    if progress_timer is not None:
+                        progress_timer.deactivate()
+                        flush_output()
 
                 if success:
-                    for line in output.splitlines():
-                        if line.strip():
-                            self.update_workflow.push_log(line.strip(), LogLevel.DEBUG)
+                    if not streamed_output:
+                        for line in output.splitlines():
+                            if line.strip():
+                                self.update_workflow.push_log(line.strip(), LogLevel.DEBUG)
                     success_count += 1
                     successful_updates.append(
                         {

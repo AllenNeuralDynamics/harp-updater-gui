@@ -1,6 +1,8 @@
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 
 import pytest
 
@@ -66,6 +68,70 @@ def test_atxmega_validation_command(mocker):
             "--no-upload",
         ]
     )
+
+
+@pytest.mark.parametrize("returncode", [0, 1])
+def test_streaming_output_arrives_before_process_exit(mocker, returncode):
+    cli = CLIWrapper()
+    original_popen = subprocess.Popen
+    processes = []
+    first_update = Event()
+    messages = []
+    code = (
+        "import sys; "
+        "sys.stdout.buffer.write(b'10% Write\\r'); sys.stdout.flush(); "
+        "sys.stdin.readline(); "
+        "sys.stdout.buffer.write(b'Firmware written\\r\\n'); sys.stdout.flush(); "
+        "sys.stderr.write('Readiness result'); sys.stderr.flush(); "
+        f"sys.exit({returncode})"
+    )
+
+    def start_process(*args, **kwargs):
+        process = original_popen(*args, stdin=subprocess.PIPE, **kwargs)
+        processes.append(process)
+        return process
+
+    def on_output(message):
+        messages.append(message)
+        if message == "10% Write":
+            first_update.set()
+
+    mocker.patch.object(subprocess, "Popen", side_effect=start_process)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            cli._run_streaming_command, [sys.executable, "-u", "-c", code], on_output
+        )
+        try:
+            assert first_update.wait(timeout=5)
+            assert processes[0].poll() is None
+            assert messages == ["10% Write"]
+        finally:
+            if processes:
+                processes[0].stdin.write(b"continue\n")
+                processes[0].stdin.flush()
+        if returncode:
+            with pytest.raises(subprocess.CalledProcessError) as error:
+                future.result(timeout=5)
+            output = error.value.stdout
+        else:
+            output = future.result(timeout=5).stdout
+
+    assert messages == ["10% Write", "Firmware written", "Readiness result"]
+    assert output == "10% Write\rFirmware written\r\nReadiness result"
+
+
+def test_upload_callback_selects_streaming_runner(mocker):
+    cli = CLIWrapper()
+    callback = mocker.Mock()
+    streaming = mocker.patch.object(
+        cli, "_run_streaming_command",
+        return_value=subprocess.CompletedProcess([], 0, stdout="Uploaded"),
+    )
+    buffered = mocker.patch.object(cli, "_run_command")
+
+    assert cli.upload_firmware("firmware.hex", "COM4", on_output=callback) == (True, "Uploaded")
+    assert streaming.call_args.args[1] is callback
+    buffered.assert_not_called()
 
 
 @pytest.mark.skipif(

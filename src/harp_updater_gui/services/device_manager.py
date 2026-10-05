@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Callable, List, Optional
 from harp_updater_gui.services.cli_wrapper import CLIWrapper
 from harp_updater_gui.services.device_operations import (
     DEVICE_OPERATIONS,
@@ -157,6 +157,7 @@ class DeviceManager:
         force: bool = False,
         *,
         operation: DeviceOperationLease | None = None,
+        on_output: Optional[Callable[[str], None]] = None,
     ) -> tuple[bool, str]:
         """
         Upload firmware to a specific device
@@ -165,6 +166,7 @@ class DeviceManager:
             device: Target device
             firmware_path: Path to firmware file
             force: Force upload even if checks fail
+            on_output: Receive regulator output as it arrives
 
         Returns:
             Tuple of (success, message)
@@ -212,6 +214,7 @@ class DeviceManager:
                     no_interactive=True,
                     progress=device.kind == "ATxmega",
                     verbose=force,
+                    on_output=on_output,
                 )
         except DeviceOperationBusy as error:
             return False, str(error)
