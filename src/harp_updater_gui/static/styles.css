@@ -63,15 +63,29 @@ body.body--dark {
 body, html {
     margin: 0;
     padding: 0;
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
     font-family: 'Geist Sans', sans-serif;
+}
+
+.q-layout {
+    height: 100dvh;
+    min-height: 100dvh !important;
+}
+
+.q-page-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .nicegui-content {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0 !important;
     width: 100%;
 }
 
@@ -89,16 +103,23 @@ body, html {
     flex-wrap: nowrap;
     flex: 1;
     width: 100%;
+    min-width: 0;
     min-height: 0;
-    height: 100%;
     background-color: var(--bg-secondary);
     overflow: hidden;
-    padding-bottom: 135px;
 }
 
 .app-container > .q-splitter {
     flex: 1 1 auto;
-    min-width: 720px;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+}
+
+.app-container .q-splitter__panel {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
 }
 
 /* ===================
@@ -156,11 +177,43 @@ body, html {
    =================== */
 
 .device-table-container {
-    padding: 1.5rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     height: 100%;
-    gap: 1.5rem;
+    min-height: 0;
+    min-width: 0;
+    gap: 0.75rem;
+    margin-bottom: 0;
+    overflow-y: auto;
+}
+
+.device-table-container > :not(.device-table-scroll) {
+    flex-shrink: 0;
+}
+
+.device-table-scroll {
+    flex: 0 1 auto;
+    min-height: 140px;
+    min-width: 0;
+    width: 100%;
+}
+
+.device-table-scroll .q-table__middle {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.device-table-scroll thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--bg-primary);
+}
+
+.device-table-scroll .q-table__bottom {
+    flex-shrink: 0;
 }
 
 .device-table-header {
@@ -172,6 +225,8 @@ body, html {
 
 .device-table-controls {
     display: flex;
+    flex-wrap: wrap;
+    min-width: 0;
     gap: 0.5rem;
     align-items: center;
 }
@@ -240,22 +295,16 @@ body, html {
     background-color: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
-    padding: 1.5rem;
+    padding: 1rem;
+    min-width: 0;
+    gap: 0.5rem;
 }
 
 .firmware-upload-layout {
     display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1.25rem;
-    margin-top: 1rem;
-}
-
-.firmware-upload-file-area {
-    flex: 1 1 360px;
-    min-width: 260px;
-    gap: 0.625rem;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
 }
 
 .firmware-upload-file-row {
@@ -264,32 +313,133 @@ body, html {
 }
 
 .firmware-file-label {
+    flex: 1 1 0;
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .firmware-upload-actions {
-    flex: 0 0 280px;
-    min-width: 280px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    min-width: 0;
+    width: 100%;
+    gap: 1rem;
+}
+
+.firmware-upload-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    flex: 1 1 0;
+    min-width: 0;
     gap: 0.5rem;
-    align-self: stretch;
 }
 
 .firmware-deploy-btn {
-    /* align-self: flex-end; */
-    margin-top: 0.5rem;
+    flex-shrink: 0;
+    margin-top: 0;
 }
 
 @media (max-width: 960px) {
+    .q-layout {
+        height: auto;
+        min-height: 100dvh;
+    }
+
+    .q-page-container,
+    .nicegui-content {
+        height: auto;
+    }
+
+    .app-container {
+        overflow: visible;
+    }
+
+    .app-container > .q-splitter {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .app-container .q-splitter__panel {
+        width: 100% !important;
+        overflow: visible;
+    }
+
+    .app-container .q-splitter__separator {
+        display: none;
+    }
+
+    .device-table-container {
+        height: auto;
+        overflow: visible;
+    }
+
+    .device-table-scroll {
+        flex: 0 0 auto;
+        max-height: 200px;
+    }
+
+    .app-container .workflow-container {
+        height: 320px;
+    }
+}
+
+@media (max-width: 600px) {
     .firmware-upload-actions {
-        flex: 1 1 100%;
-        min-width: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .firmware-upload-options {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .firmware-deploy-btn {
-        align-self: flex-start;
+        align-self: flex-end;
+    }
+}
+
+@media (max-height: 640px) and (min-width: 961px) {
+    .header-container {
+        padding: 0.5rem 1rem;
+    }
+
+    .header-title {
+        font-size: 1.5rem;
+    }
+
+    .footer-container {
+        padding: 0.5rem 1rem;
+    }
+
+    .nicegui-content {
+        padding: 0.5rem;
+    }
+
+    .device-table-container {
+        gap: 0.25rem;
+        padding: 0.5rem;
+    }
+
+    .firmware-upload-card {
+        padding: 0.5rem;
+        gap: 0.25rem;
+    }
+
+    .firmware-upload-layout {
+        gap: 0.25rem;
+        margin-top: 0;
+    }
+
+    .firmware-upload-options {
+        gap: 0;
     }
 }
 

@@ -94,6 +94,31 @@ def test_busy_state_uses_real_nicegui_table_api(table):
         table.table.delete()
 
 
+def test_render_keeps_deploy_outside_the_scrollable_table(table, mocker):
+    mocker.patch.object(table_module, "ui", ui)
+    mocker.patch.object(ui, "timer")
+    table.render()
+    container = table.table.parent_slot.parent
+    try:
+        assert "device-table-scroll" in table.table.classes
+        assert table.table.pagination["rowsPerPage"] == 10
+        actions = table.deploy_button.parent_slot.parent
+        assert "firmware-upload-actions" in actions.classes
+        layout = actions.parent_slot.parent
+        assert "firmware-upload-layout" in layout.classes
+        assert "firmware-upload-file-row" in table.browse_button.parent_slot.parent.classes
+        assert table.browse_button.parent_slot.parent.parent_slot.parent is layout
+        options = table.batch_update_checkbox.parent_slot.parent
+        assert "firmware-upload-options" in options.classes
+        assert options.parent_slot.parent is actions
+        assert table.force_upload_checkbox.parent_slot.parent is options
+        firmware_section = layout.parent_slot.parent
+        assert "firmware-upload-card" in firmware_section.classes
+        assert firmware_section.parent_slot.parent is container
+    finally:
+        container.delete()
+
+
 @pytest.mark.asyncio
 async def test_second_deploy_callback_is_rejected_until_first_finishes(table):
     table.selected_device = device()

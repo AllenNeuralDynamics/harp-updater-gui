@@ -23,9 +23,11 @@ Dark mode is controlled by NiceGUI (`ui.dark_mode()`), and CSS reacts through `b
 
 ### Global Layout
 
-- `body, html` fixed-height layout
-- `.nicegui-content` column layout
-- `.app-container` splitter host area
+- The desktop layout fills the viewport using Quasar's measured header/footer spacing, without fixed pixel compensation.
+- `.nicegui-content` and `.app-container` pass the available height to the splitter panels.
+- `.device-table-scroll` fits short device lists and shrinks to the available height for longer lists; its header stays sticky and pagination stays outside the scrolling body.
+- Firmware controls do not shrink into the table. Browse and filename occupy the first row; Batch and Force sit below on the left, with Deploy on the right. Small screens stack the second row.
+- At widths of 960 CSS pixels or less, panels stack and the document scrolls. Short desktop windows use compact spacing.
 
 ### Header/Footer
 
@@ -78,3 +80,17 @@ Dark mode is controlled by NiceGUI (`ui.dark_mode()`), and CSS reacts through `b
 
 - Some classes in `styles.css` are generic helpers and may not currently be used in every component.
 - The refresh and upload loading indicators are rendered with NiceGUI dialogs and use shared utility classes such as `.items-center` and spacing helpers.
+
+## Layout Verification
+
+Check empty and single-device lists for unnecessary table whitespace, and use at least
+12 devices to exercise both table-body scrolling and pagination.
+Check long firmware filenames, row selection on the second page, and light/dark mode.
+Pagination and Deploy must stay within the desktop panel, above the fixed footer.
+On narrow windows, scrolling must expose every firmware control without horizontal page overflow.
+
+Test logical viewports of 1366x768, 1280x720, 1024x600, 800x600, and 390x844.
+For a 1366x768 display, 125% and 150% scaling correspond approximately to
+1093x614 and 911x512 logical viewports. Browser viewport checks cover the layout
+at these sizes; verify native WebView resizing and actual Windows DPI transitions
+on the release machine as well.

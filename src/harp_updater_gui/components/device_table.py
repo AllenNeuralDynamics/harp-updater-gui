@@ -130,12 +130,12 @@ class DeviceTable:
 
     def render(self):
         """Render the device table panel"""
-        with ui.column().classes("device-table-container w-full mb-3"):
+        with ui.column().classes("device-table-container w-full"):
             # Header with controls
-            with ui.row().classes("w-full items-center justify-between gap-4"):
+            with ui.row().classes("device-table-header w-full items-center justify-between"):
                 ui.label("Harp Devices").classes("text-2xl font-bold")
 
-                with ui.row().classes("gap-4"):
+                with ui.row().classes("device-table-controls"):
                     # Search input with dynamic filtering
                     search_input = ui.input(placeholder="Search devices...").classes(
                         "w-48"
@@ -230,7 +230,7 @@ class DeviceTable:
                         "descending": False,
                     },
                 )
-                .classes("w-full")
+                .classes("device-table-scroll w-full")
                 .props("flat bordered")
                 .on("selection", self.on_row_select)
             )
@@ -253,32 +253,31 @@ class DeviceTable:
             with ui.card().classes("w-full p-4 firmware-upload-card"):
                 ui.label("Firmware Upload").classes("text-lg font-semibold")
 
-                with ui.row().classes("w-full firmware-upload-layout"):
-                    with ui.column().classes("firmware-upload-file-area"):
-                        ui.label("Select Firmware File").classes("text-sm font-medium")
-                        with ui.row().classes("items-center gap-3 firmware-upload-file-row"):
-                            self.browse_button = ui.button(
-                                "📁 Browse", on_click=self.browse_firmware
-                            ).classes("btn btn-secondary")
-                            self.file_path_label = ui.label("No file selected").classes(
-                                "text-sm text-secondary firmware-file-label"
+                with ui.column().classes("w-full firmware-upload-layout"):
+                    with ui.row().classes("items-center gap-3 firmware-upload-file-row"):
+                        self.browse_button = ui.button(
+                            "📁 Browse", on_click=self.browse_firmware
+                        ).classes("btn btn-secondary")
+                        self.file_path_label = ui.label("No file selected").classes(
+                            "text-sm text-secondary firmware-file-label"
+                        )
+
+                    with ui.row().classes("firmware-upload-actions"):
+                        with ui.row().classes("firmware-upload-options"):
+                            self.batch_update_checkbox = ui.checkbox(
+                                "Update all devices with same name"
                             )
-
-                    with ui.column().classes("firmware-upload-actions"):
-                        self.batch_update_checkbox = ui.checkbox(
-                            "Update all devices with same name"
-                        )
-                        self.batch_update_checkbox.tooltip(
-                            "When enabled, all devices with the same name as the selected device will be updated"
-                        )
-                        self.batch_update_checkbox.on_value_change(self._update_control_state)
-                        self.force_upload_checkbox = ui.checkbox(
-                            "Force upload (bypass safety checks)"
-                        )
-
+                            self.batch_update_checkbox.tooltip(
+                                "When enabled, all devices with the same name as the selected device will be updated"
+                            )
+                            self.batch_update_checkbox.on_value_change(self._update_control_state)
+                            self.force_upload_checkbox = ui.checkbox(
+                                "Force upload (bypass safety checks)"
+                            )
                         self.deploy_button = ui.button(
                             "🚀 Deploy Firmware", on_click=self.deploy_firmware
                         ).classes("btn btn-primary firmware-deploy-btn")
+
                     self.deploy_button.set_enabled(False)
 
             # Initial load
@@ -526,6 +525,7 @@ class DeviceTable:
                     selected_path = paths[0]
                     self.firmware_file_path = selected_path
                     self.file_path_label.set_text(Path(selected_path).name)
+                    self.file_path_label.tooltip(selected_path)
                     self._update_control_state()
                     ui.notify(f"Selected: {Path(selected_path).name}", type="info")
                 return
@@ -560,6 +560,7 @@ class DeviceTable:
         if result:
             self.firmware_file_path = result
             self.file_path_label.set_text(result)
+            self.file_path_label.tooltip(result)
             self._update_control_state()
             ui.notify(f"Selected: {result}", type="info")
 
