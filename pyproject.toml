@@ -1,6 +1,6 @@
 [project]
 name = "harp-updater-gui"
-version = "0.1.0"
+version = "0.2.0"
 description = "A GUI for managing Harp devices and updating firmware."
 authors = [
     {name = "Anjal Doshi", email = "anjal.doshi@alleninstitute.org"}
